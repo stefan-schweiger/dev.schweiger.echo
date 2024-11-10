@@ -63,6 +63,17 @@
       "alexa"
     ]
   },
+  "contributing": {
+    "donate": {
+      "paypal": {
+        "username": "StefanSchweiger"
+      }
+    }
+  },
+  "source": "https://github.com/stefan-schweiger/dev.schweiger.echo",
+  "bugs": {
+    "url": "https://github.com/stefan-schweiger/dev.schweiger.echo/issues"
+  },
   "flow": {
     "triggers": [
       {
