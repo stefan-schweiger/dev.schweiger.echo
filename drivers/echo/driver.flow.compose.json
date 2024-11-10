@@ -1,0 +1,103 @@
+{
+  "actions": [
+    {
+      "id": "message",
+      "title": {
+        "en": "Say Message"
+      },
+      "titleFormatted": {
+        "en": "[[speech]] [[message]]"
+      },
+      "args": [
+        {
+          "type": "dropdown",
+          "name": "speech",
+          "placeholder": {
+            "en": "Say"
+          },
+          "values": [
+            {
+              "id": "speak",
+              "label": {
+                "en": "Say"
+              }
+            },
+            {
+              "id": "announce",
+              "label": {
+                "en": "Announce"
+              }
+            },
+            {
+              "id": "whisper",
+              "label": {
+                "en": "Whisper"
+              }
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "message",
+          "placeholder": {
+            "en": "Message"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command",
+      "title": {
+        "en": "Ask custom command"
+      },
+      "titleFormatted": {
+        "en": "Ask [[command]]"
+      },
+      "args": [
+        {
+          "type": "text",
+          "name": "command",
+          "placeholder": {
+            "en": "Command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "play-sound",
+      "title": {
+        "en": "Play Sound"
+      },
+      "titleFormatted": {
+        "en": "Play [[sound]]"
+      },
+      "args": [
+        {
+          "type": "autocomplete",
+          "name": "sound",
+          "placeholder": {
+            "en": "Sound"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run-routine",
+      "title": {
+        "en": "Run Routine"
+      },
+      "titleFormatted": {
+        "en": "Run [[routine]] Routine"
+      },
+      "args": [
+        {
+          "type": "autocomplete",
+          "name": "routine",
+          "placeholder": {
+            "en": "Routine"
+          }
+        }
+      ]
+    }
+  ]
+}

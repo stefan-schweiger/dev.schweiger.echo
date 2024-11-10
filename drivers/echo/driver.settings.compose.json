@@ -1,0 +1,26 @@
+[
+  {
+    "type": "group",
+    "label": {
+      "en": "Device Information"
+    },
+    "children": [
+      {
+        "id": "serial_number",
+        "type": "label",
+        "label": {
+          "en": "Serial Number"
+        },
+        "value": ""
+      },
+      {
+        "id": "capabilities",
+        "type": "label",
+        "label": {
+          "en": "Capabilities"
+        },
+        "value": ""
+      }
+    ]
+  }
+]

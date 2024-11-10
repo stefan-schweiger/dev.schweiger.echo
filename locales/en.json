@@ -1,0 +1,16 @@
+{
+  "settings": {
+    "title": "Connection to Amazon Account",
+    "server": "Server",
+    "page": "Amazon Website",
+    "connect": "Connect",
+    "connected": "Connected",
+    "success": "You are successfully connected to Amazon Alexa Services.",
+    "disconnect": "Disconnect",
+    "servers": {
+      "northAmerica": "North America",
+      "europeIndia": "EU and India",
+      "farEast": "Far East"
+    }
+  }
+}

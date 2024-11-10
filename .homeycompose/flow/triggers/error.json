@@ -1,0 +1,17 @@
+{
+  "title": {
+    "en": "An error occured"
+  },
+  "tokens": [
+    {
+      "type": "string",
+      "name": "error",
+      "title": {
+        "en": "error"
+      },
+      "example": {
+        "en": "Error Information"
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Bring your smart home experience to the next level by integrating Amazon Echo speakers with Homey. This app lets you control your Echo devices directly from Homey, allowing you to create powerful automation and manage music, volume, and more—all in one place. Experience hands-free convenience and full control over your Echo speakers through the Homey app.

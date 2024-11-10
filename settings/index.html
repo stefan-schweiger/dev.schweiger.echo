@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+  <head>
+    <!-- The '/homey.js' script must be included in your settings view to work -->
+    <script type="text/javascript" src="/homey.js" data-origin="settings"></script>
+    <style>
+      .hidden {
+        display: none;
+      }
+      .center {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="homey-header">
+      <h1 class="homey-title" data-i18n="settings.title">
+        <!-- This will be filled with the translated string with key 'settings.title'. -->
+      </h1>
+    </header>
+
+    <div id="connect-container" class="hidden">
+      <fieldset class="homey-form-fieldset">
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="alexa-server" data-i18n="settings.server"></label>
+          <select class="homey-form-select" name="alexa-server" id="alexa-server">
+            <option value="pitangui.amazon.com" data-i18n="settings.servers.northAmerica"></option>
+            <option value="layla.amazon.de" data-i18n="settings.servers.europeIndia"></option>
+            <option value="alexa.amazon.co.jp" data-i18n="settings.servers.farEast"></option>
+          </select>
+
+          <label class="homey-form-label" for="amazon-page" data-i18n="settings.page"></label>
+          <select class="homey-form-select" name="amazon-page" id="amazon-page">
+            <option value="https://www.amazon.com">amazon.com</option>
+            <option value="https://www.amazon.co.uk">amazon.co.uk</option>
+            <option value="https://www.amazon.ca">amazon.ca</option>
+            <option value="https://www.amazon.de">amazon.de</option>
+            <option value="https://www.amazon.es">amazon.es</option>
+            <option value="https://www.amazon.fr">amazon.fr</option>
+            <option value="https://www.amazon.it">amazon.it</option>
+            <option value="https://www.amazon.nl">amazon.nl</option>
+            <option value="https://www.amazon.pl">amazon.pl</option>
+            <option value="https://www.amazon.co.jp">amazon.co.jp</option>
+            <option value="https://www.amazon.in">amazon.in</option>
+            <option value="https://www.amazon.cn">amazon.cn</option>
+            <option value="https://www.amazon.com.sg">amazon.com.sg</option>
+            <option value="https://www.amazon.com.mx">amazon.com.mx</option>
+            <option value="https://www.amazon.ae">amazon.ae</option>
+            <option value="https://www.amazon.com.br">amazon.com.br</option>
+            <option value="https://www.amazon.com.au">amazon.com.au</option>
+            <option value="https://www.amazon.com.tr">amazon.com.tr</option>
+            <option value="https://www.amazon.sa">amazon.sa</option>
+            <option value="https://www.amazon.se">amazon.se</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <button id="connect" class="homey-button-primary-full" data-i18n="settings.connect"></button>
+    </div>
+    <div id="connected-container" class="hidden">
+      <h1 class="homey-title center" data-i18n="settings.connected"></h1>
+      <p class="homey-subtitle center" data-i18n="settings.success"></p>
+      <button id="disconnect" class="homey-button-danger-full" data-i18n="settings.disconnect"></button>
+    </div>
+
+    <script type="text/javascript">
+      const updateConnection = (connected) => {
+        if (connected) {
+          document.getElementById('connect-container').classList.add('hidden');
+          document.getElementById('connected-container').classList.remove('hidden');
+        } else {
+          document.getElementById('connect-container').classList.remove('hidden');
+          document.getElementById('connected-container').classList.add('hidden');
+        }
+      };
+
+      const handleResult = (resolve, err, res) => {
+        if (err) return Homey.alert(err);
+        resolve(res);
+      };
+
+      function onHomeyReady(Homey) {
+        const checkStatus = () => {
+          Homey.api('GET', '/status', undefined, (err, res) => {
+            if (err) return Homey.alert(err);
+            updateConnection(res.connected);
+          });
+        };
+
+        checkStatus();
+
+        // TODO: does not work for whatever reason
+        Homey.on('connected', (connected) => updateConnection(connected));
+        // so we use this as a workaround
+        setInterval(() => checkStatus(), 500);
+
+        const serverElement = document.getElementById('alexa-server');
+
+        Homey.get('server', (err, server) => {
+          if (err) return Homey.alert(err);
+          serverElement.value = server;
+        });
+
+        const pageElement = document.getElementById('amazon-page');
+        Homey.get('page', (err, page) => {
+          if (err) return Homey.alert(err);
+          pageElement.value = page;
+        });
+
+        // Tell Homey we're ready to be displayed
+        Homey.ready();
+
+        document.getElementById('connect').addEventListener('click', (e) => {
+          Promise.all([
+            new Promise((r) => Homey.set('server', serverElement.value, (err) => handleResult(r, err))),
+            new Promise((r) => Homey.set('page', pageElement.value, (err) => handleResult(r, err))),
+          ]).then(() => {
+            Homey.api('POST', '/connect', undefined, (err, res) => {
+              if (err) return Homey.alert(err);
+
+              if (res.type === 'proxy') {
+                Homey.popup(res.url);
+              }
+            });
+          });
+        });
+
+        document.getElementById('disconnect').addEventListener('click', (e) => {
+          Homey.api('POST', '/disconnect', undefined, (err) => {
+            if (err) return Homey.alert(err);
+            updateConnection(false);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

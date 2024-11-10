@@ -1,0 +1,45 @@
+{
+  "id": "dev.schweiger.echo",
+  "version": "1.0.0",
+  "compatibility": ">=5.0.0",
+  "sdk": 3,
+  "platforms": ["local"],
+  "name": {
+    "en": "Amazon Echo"
+  },
+  "description": {
+    "en": "Your Home, Your Assistant, Always Ready"
+  },
+  "category": ["internet"],
+  "permissions": [],
+  "api": {
+    "connect": {
+      "method": "POST",
+      "path": "/connect"
+    },
+    "disconnect": {
+      "method": "POST",
+      "path": "/disconnect"
+    },
+    "status": {
+      "method": "GET",
+      "path": "/status"
+    }
+  },
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Stefan Schweiger",
+    "email": "st.schweiger@me.com"
+  },
+  "brandColor": "#01a7ce",
+  "tags": {
+    "en": ["amazon", "echo", "alexa"],
+    "de": ["amazon", "echo", "alexa"],
+    "nl": ["amazon", "echo", "alexa"],
+    "fr": ["amazon", "echo", "alexa"]
+  }
+}
