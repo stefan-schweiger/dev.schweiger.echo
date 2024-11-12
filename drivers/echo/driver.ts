@@ -39,6 +39,12 @@ module.exports = class EchoDriver extends Homey.Driver {
       .registerRunListener((args, _state) => this.api.executeRoutine(args.device.id, args.routine.id));
   }
 
+  async onPair(session: Homey.Driver.PairSession): Promise<void> {
+    if (!this.api.connected) {
+      throw new Error('Please check the connection to your Amazon account in the app settings');
+    }
+  }
+
   /**
    * onPairListDevices is called when a user is adding a device and the 'list_devices' view is called.
    * This should return an array with the data of devices that are available for pairing.

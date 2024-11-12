@@ -1,7 +1,7 @@
 import AlexaRemote, { InitOptions, MessageCommands, SequenceNodeCommand } from 'alexa-remote2';
 import Homey from 'homey';
 import IP from 'neoip';
-import { promisify, promisifyWithOptions } from './helpers';
+import { promisify, promisifyWithOptions, sleep } from './helpers';
 import Cache from 'node-cache';
 
 const SUCCESS_HTML = `<!doctype html>
@@ -119,30 +119,35 @@ export class AlexaApi extends Homey.SimpleClass {
     });
 
     this.on('connected', async (connected) => {
-      if (connected && this.connected !== connected) {
-        const devices = await this.getDevices();
+      try {
+        await sleep(5000);
+        if (connected && this.connected !== connected) {
+          const devices = await this.getDevices();
 
-        for (const device of devices) {
-          const info = await this.getPlayerInfo(device.id);
+          for (const device of devices) {
+            const info = await this.getPlayerInfo(device.id);
 
-          this.emit('device-info', info);
+            this.emit('device-info', info);
 
-          if (!info.playing && device.parentGroups) {
-            for (const parentGroup of device.parentGroups) {
-              const parentInfo = await this.getPlayerInfo(parentGroup);
+            if (!info.playing && device.parentGroups) {
+              for (const parentGroup of device.parentGroups) {
+                const parentInfo = await this.getPlayerInfo(parentGroup);
 
-              if (parentInfo.playing) {
-                this.emit('device-info', {
-                  ...parentInfo,
-                  id: device.id,
-                });
+                if (parentInfo.playing) {
+                  this.emit('device-info', {
+                    ...parentInfo,
+                    id: device.id,
+                  });
+                }
               }
             }
           }
         }
-      }
 
-      this.connected = connected;
+        this.connected = connected;
+      } catch (e) {
+        this.emit('error', e);
+      }
     });
 
     const handleMedia = async (payload: any) => {

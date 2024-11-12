@@ -26,3 +26,5 @@ export function promisifyWithOptions<T extends any = unknown, TOptions extends a
     });
   });
 }
+
+export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

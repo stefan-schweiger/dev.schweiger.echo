@@ -1,0 +1,8 @@
+{
+  "1.0.0": {
+    "en": "Initial release"
+  },
+  "1.0.1": {
+    "en": "Made startup more stable, show error if account not connected"
+  }
+}
