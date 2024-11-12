@@ -4,5 +4,8 @@
   },
   "1.0.1": {
     "en": "Made startup more stable, show error if account not connected"
+  },
+  "1.0.2": {
+    "en": "Add option to enable diagnostic logging"
   }
 }
