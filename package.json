@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "alexa-remote2": "^7.0.4",
+    "homey-log": "^2.1.0",
     "neoip": "^3.0.1",
     "node-cache": "^5.1.2",
     "prettier": "^3.2.5"

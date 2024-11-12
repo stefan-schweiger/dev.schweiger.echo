@@ -53,6 +53,18 @@
             <option value="https://www.amazon.se">amazon.se</option>
           </select>
         </div>
+
+        <div class="homey-form-group">
+          <fieldset class="homey-form-checkbox-set">
+            <legend class="homey-form-checkbox-set-title">Advanced settings</legend>
+
+            <label class="homey-form-checkbox">
+              <input class="homey-form-checkbox-input" type="checkbox" name="diagnostic-logging" id="diagnostic-logging" />
+              <span class="homey-form-checkbox-checkmark"></span>
+              <span class="homey-form-checkbox-text">Enable diagnostic logging</span>
+            </label>
+          </fieldset>
+        </div>
       </fieldset>
 
       <button id="connect" class="homey-button-primary-full" data-i18n="settings.connect"></button>
@@ -107,6 +119,12 @@
           pageElement.value = page;
         });
 
+        const diagnosticLoggingElement = document.getElementById('diagnostic-logging');
+        Homey.get('diagnosticLogging', (err, diagnosticLogging) => {
+          if (err) return Homey.alert(err);
+          diagnosticLoggingElement.checked = diagnosticLogging;
+        });
+
         // Tell Homey we're ready to be displayed
         Homey.ready();
 
@@ -114,6 +132,7 @@
           Promise.all([
             new Promise((r) => Homey.set('server', serverElement.value, (err) => handleResult(r, err))),
             new Promise((r) => Homey.set('page', pageElement.value, (err) => handleResult(r, err))),
+            new Promise((r) => Homey.set('diagnosticLogging', diagnosticLoggingElement.checked, (err) => handleResult(r, err))),
           ]).then(() => {
             Homey.api('POST', '/connect', undefined, (err, res) => {
               if (err) return Homey.alert(err);

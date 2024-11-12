@@ -101,13 +101,16 @@ export class AlexaApi extends Homey.SimpleClass {
   private alexa = new AlexaRemote();
   private cache = new Cache({ stdTTL: 60 });
 
-  constructor(private authData: any) {
+  constructor(
+    private authData: any,
+    private logger: (message: string) => void = console.log,
+  ) {
     super();
     this.alexa.on('cookie', async () => {
       this.authData = this.alexa.cookieData;
       this.emit('authenticated', this.authData);
 
-      await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+      await sleep(3000);
       await this.audit();
     });
 
@@ -177,8 +180,28 @@ export class AlexaApi extends Homey.SimpleClass {
   private async init(options: { server: string; page: string; language: string }): Promise<void> {
     const defaultOptions: Partial<InitOptions> = {
       apiUserAgentPostfix: '',
-      logger: () => console.log,
-      proxyLogLevel: 'debug',
+      logger: (message) => {
+        if (
+          !message.startsWith('Alexa-Remote:') ||
+          message.startsWith('Alexa-Remote: Auth token:') ||
+          message.includes('access_token') ||
+          message.includes('"firstName"') ||
+          message.startsWith('Alexa-Remote: No authentication check needed')
+        ) {
+          return;
+        }
+        this.logger(
+          message
+            .replace(/\"customerName\":\s?\".*\"/g, '"customerName":"REDACTED"')
+            .replace(/\"customerEmail\":\s?\".*\"/g, '"customerEmail":"REDACTED"')
+            .replace(/\"customerId\":\s?\".*\"/g, '"customerId":"REDACTED"')
+            .replace(/\"address[1-3]\":\s?\".*\"/g, '"address":"REDACTED"')
+            .replace(/\"deviceAddress\":\s?\".*\"/g, '"deviceAddress":"REDACTED"')
+            .replace(/\"state\":\s?\".*\"/g, '"address":"REDACTED"'),
+        );
+      },
+      deviceAppName: 'Homey Echo Integration',
+      proxyLogLevel: 'warn',
       alexaServiceHost: options.server || undefined,
       amazonPage: options.page || undefined,
       cookieRefreshInterval: 7 * 24 * 60 * 60 * 1000,
@@ -274,7 +297,7 @@ export class AlexaApi extends Homey.SimpleClass {
 
   private async sendSequenceCommand(device: string, command: SequenceNodeCommand, value: any) {
     try {
-      await new Promise<any>((resolve, reject) => {
+      return await new Promise<any>((resolve, reject) => {
         this.alexa.sendSequenceCommand(device, command, value, (error, result) => (error ? reject(error) : resolve(result)));
       });
     } catch (e) {
