@@ -7,5 +7,8 @@
   },
   "1.0.2": {
     "en": "Add option to enable diagnostic logging"
+  },
+  "1.0.3": {
+    "en": "Fixed volume control for certain devices"
   }
 }
