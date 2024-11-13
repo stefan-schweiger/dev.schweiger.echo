@@ -363,7 +363,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   public async changeVolume(device: string, volume: number) {
-    return this.sendCommand(device, 'volume', volume * 100);
+    return this.sendSequenceCommand(device, 'volume', volume * 100);
   }
 
   public async changePlayback(device: string, action: 'play' | 'pause' | 'next' | 'previous' | 'repeat' | 'shuffle', value = true) {
