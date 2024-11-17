@@ -3,6 +3,7 @@ import Homey from 'homey';
 import IP from 'neoip';
 import { promisify, promisifyWithOptions, sleep } from './helpers';
 import Cache from 'node-cache';
+import { Logger } from './logger';
 
 const SUCCESS_HTML = `<!doctype html>
 <html>
@@ -86,6 +87,15 @@ export type Sound = {
   name: string;
 };
 
+export type ConnectionResult =
+  | {
+      type: 'connected';
+    }
+  | {
+      type: 'proxy';
+      url?: string;
+    };
+
 const LANG_MAP: Record<string, string> = {
   de: 'de-DE',
   en: 'en-US',
@@ -96,6 +106,26 @@ const LANG_MAP: Record<string, string> = {
   nl: 'nl-NL',
 };
 
+const filterLogMessage = (message: string) => {
+  if (
+    !message.startsWith('Alexa-Remote:') ||
+    message.startsWith('Alexa-Remote: Auth token:') ||
+    message.includes('access_token') ||
+    message.includes('"firstName"') ||
+    message.startsWith('Alexa-Remote: No authentication check needed')
+  ) {
+    return undefined;
+  }
+
+  return message
+    .replace(/\"customerName\":\s?\".*\"/g, '"customerName":"REDACTED"')
+    .replace(/\"customerEmail\":\s?\".*\"/g, '"customerEmail":"REDACTED"')
+    .replace(/\"customerId\":\s?\".*\"/g, '"customerId":"REDACTED"')
+    .replace(/\"address[1-3]\":\s?\".*\"/g, '"address":"REDACTED"')
+    .replace(/\"deviceAddress\":\s?\".*\"/g, '"deviceAddress":"REDACTED"')
+    .replace(/\"state\":\s?\".*\"/g, '"address":"REDACTED"');
+};
+
 export class AlexaApi extends Homey.SimpleClass {
   public connected: boolean = false;
   private alexa = new AlexaRemote();
@@ -103,16 +133,9 @@ export class AlexaApi extends Homey.SimpleClass {
 
   constructor(
     private authData: any,
-    private logger: (message: string) => void = console.log,
+    private logger: Logger,
   ) {
     super();
-    this.alexa.on('cookie', async () => {
-      this.authData = this.alexa.cookieData;
-      this.emit('authenticated', this.authData);
-
-      await sleep(3000);
-      await this.audit();
-    });
 
     this.alexa.on('ws-volume-change', (payload) => {
       this.emit<DeviceInfo>('device-info', {
@@ -123,53 +146,42 @@ export class AlexaApi extends Homey.SimpleClass {
 
     this.on('connected', async (connected) => {
       try {
-        await sleep(5000);
-        if (connected && this.connected !== connected) {
-          const devices = await this.getDevices();
-
-          for (const device of devices) {
-            const info = await this.getPlayerInfo(device.id);
-
-            this.emit('device-info', info);
-
-            if (!info.playing && device.parentGroups) {
-              for (const parentGroup of device.parentGroups) {
-                const parentInfo = await this.getPlayerInfo(parentGroup);
-
-                if (parentInfo.playing) {
-                  this.emit('device-info', {
-                    ...parentInfo,
-                    id: device.id,
-                  });
-                }
-              }
-            }
-          }
+        if (this.connected === connected) {
+          return;
         }
 
         this.connected = connected;
+
+        if (connected) {
+          await sleep(3000);
+          await this.updateAllPlayers();
+        }
       } catch (e) {
         this.emit('error', e);
       }
     });
 
     const handleMedia = async (payload: any) => {
-      const playerInfo = await this.getPlayerInfo(payload.deviceSerialNumber);
+      try {
+        const playerInfo = await this.getPlayerInfo(payload.deviceSerialNumber);
 
-      this.emit<DeviceInfo>('device-info', {
-        ...playerInfo,
-        ...{
-          id: payload.deviceSerialNumber,
-          playing: payload.audioPlayerState ? payload.audioPlayerState === 'PLAYING' : undefined,
-          shuffle: payload.playBackOrder ? payload.playBackOrder !== 'NORMAL' : undefined,
-          repeat: payload.loopMode
-            ? ({
-                REPEAT_ONE: 'track', // TODO: wasn't able to find real value
-                LOOP_QUEUE: 'playlist',
-              }[payload.loopMode as string] ?? 'none')
-            : undefined,
-        },
-      });
+        this.emit<DeviceInfo>('device-info', {
+          ...playerInfo,
+          ...{
+            id: payload.deviceSerialNumber,
+            playing: payload.audioPlayerState ? payload.audioPlayerState === 'PLAYING' : undefined,
+            shuffle: payload.playBackOrder ? payload.playBackOrder !== 'NORMAL' : undefined,
+            repeat: payload.loopMode
+              ? ({
+                  REPEAT_ONE: 'track', // TODO: wasn't able to find real value
+                  LOOP_QUEUE: 'playlist',
+                }[payload.loopMode as string] ?? 'none')
+              : undefined,
+          },
+        });
+      } catch (e) {
+        this.emit('error', e);
+      }
     };
 
     this.alexa.on('ws-audio-player-state-change', handleMedia);
@@ -177,28 +189,12 @@ export class AlexaApi extends Homey.SimpleClass {
     this.alexa.on('ws-media-change', handleMedia);
   }
 
-  private async init(options: { server: string; page: string; language: string }): Promise<void> {
+  private async init(options: { cookie: any; server: string; page: string; language: string }): Promise<void> {
     const defaultOptions: Partial<InitOptions> = {
       apiUserAgentPostfix: '',
       logger: (message) => {
-        if (
-          !message.startsWith('Alexa-Remote:') ||
-          message.startsWith('Alexa-Remote: Auth token:') ||
-          message.includes('access_token') ||
-          message.includes('"firstName"') ||
-          message.startsWith('Alexa-Remote: No authentication check needed')
-        ) {
-          return;
-        }
-        this.logger(
-          message
-            .replace(/\"customerName\":\s?\".*\"/g, '"customerName":"REDACTED"')
-            .replace(/\"customerEmail\":\s?\".*\"/g, '"customerEmail":"REDACTED"')
-            .replace(/\"customerId\":\s?\".*\"/g, '"customerId":"REDACTED"')
-            .replace(/\"address[1-3]\":\s?\".*\"/g, '"address":"REDACTED"')
-            .replace(/\"deviceAddress\":\s?\".*\"/g, '"deviceAddress":"REDACTED"')
-            .replace(/\"state\":\s?\".*\"/g, '"address":"REDACTED"'),
-        );
+        message = filterLogMessage(message);
+        message && this.logger.debug(message);
       },
       deviceAppName: 'Homey Echo Integration',
       proxyLogLevel: 'warn',
@@ -209,9 +205,11 @@ export class AlexaApi extends Homey.SimpleClass {
       acceptLanguage: LANG_MAP[options.language] || 'en-US',
     };
 
-    const opts = this.authData
+    this.logger.info(options.cookie ? 'Using cookie' : 'No cookie found');
+
+    const opts = options.cookie
       ? {
-          cookie: this.authData,
+          cookie: options.cookie,
           ...defaultOptions,
           setupProxy: false,
           proxyOnly: false,
@@ -230,7 +228,10 @@ export class AlexaApi extends Homey.SimpleClass {
     await promisifyWithOptions(this.alexa.init.bind(this.alexa), { ...opts });
   }
 
-  public async audit() {
+  public async checkConnection() {
+    this.logger.info('Checking connection');
+    // // slight delay to give the connection time to establish
+    // await sleep(2000);
     try {
       const connected = await new Promise<boolean>((resolve, reject) =>
         // for whatever reason this has the reverse signature
@@ -242,49 +243,84 @@ export class AlexaApi extends Homey.SimpleClass {
           }
         }),
       );
+      this.logger.info('Connection checked: ' + connected);
       this.emit('connected', connected);
-      return connected;
     } catch (e) {
-      this.emit('error', e);
-      return false;
+      this.logger.info('Connection checked: error');
+      this.logger.debug(JSON.stringify(e));
+      this.emit('connected', false);
     }
   }
 
-  public async reset() {
-    this.alexa.cookie = undefined;
-    this.alexa.cookieData = undefined;
-    this.authData = undefined;
-    this.cache.del(['devices', 'sounds', 'routines']);
-    this.connected = false;
-    this.emit('authenticated', this.authData);
-  }
+  public async connect(options: { server: string; page: string; language: string }): Promise<ConnectionResult> {
+    let result: ConnectionResult | Error = {
+      type: 'connected' as const,
+    };
 
-  public async connect(options: { server: string; page: string; language: string }) {
     try {
-      await this.init(options);
-      await this.audit();
+      this.logger.info('Connecting');
+      const auth = this.authData;
+      this.reset();
+      await this.init({ cookie: auth, ...options });
+      this.logger.info('Done Initializing');
     } catch (e) {
       if (!(e instanceof Error)) {
         throw new Error('Unknown error: ' + e);
       }
 
+      // if we need to open a proxy, we return the url
       if (e.message.startsWith('Please open')) {
-        return {
+        this.logger.info('Proxy started');
+        result = {
           type: 'proxy' as const,
           url: e.message.match(/https?:\/\/[^ ]+/)?.[0],
         };
+      } else {
+        this.logger.info('Other error during init');
+        this.emit('error', e);
+        result = e;
       }
-
-      this.emit('error', e);
-      throw e;
     }
 
-    return {
-      type: 'connected' as const,
-    };
+    // if we have a cookie, we are already authenticated
+    if (this.alexa.cookieData) {
+      this.logger.info('Authenticated');
+      this.authData = this.alexa.cookieData;
+      this.emit('authenticated', this.authData);
+    }
+
+    // only after we are initialized we can listen for the cookie event
+    // otherwise we might get duplicate events
+    this.alexa.removeAllListeners('cookie');
+    this.alexa.on('cookie', async () => {
+      this.logger.info('Cookie Data received');
+      this.authData = this.alexa.cookieData;
+      this.emit('authenticated', this.authData);
+      await this.checkConnection();
+    });
+
+    await this.checkConnection();
+
+    if (result instanceof Error) {
+      throw result;
+    }
+
+    return result;
+  }
+
+  public async reset() {
+    this.alexa.stop();
+    this.alexa.cookie = undefined;
+    this.alexa.cookieData = undefined;
+    this.authData = undefined;
+    this.cache.del(['devices', 'sounds', 'routines']);
+    this.connected = false;
+    this.emit('connected', false);
+    this.emit('authenticated', undefined);
   }
 
   private async sendCommand(device: string, command: MessageCommands, value: any) {
+    this.logger.debug(`Sending command ${command} to ${device} with value ${value}`);
     try {
       return new Promise<any>((resolve, reject) => {
         this.alexa?.sendCommand(device, command, value, (error, result) => (error ? reject(error) : resolve(result)));
@@ -296,6 +332,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   private async sendSequenceCommand(device: string, command: SequenceNodeCommand, value: any) {
+    this.logger.debug(`Sending sequence command ${command} to ${device} with value ${value}`);
     try {
       return await new Promise<any>((resolve, reject) => {
         this.alexa.sendSequenceCommand(device, command, value, (error, result) => (error ? reject(error) : resolve(result)));
@@ -307,6 +344,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   public async getDevices(): Promise<Device[]> {
+    this.logger.debug('Getting devices');
     try {
       let devices = this.cache.get<any[]>('devices');
 
@@ -371,6 +409,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   public async getPlayerInfo(device: string): Promise<Partial<DeviceInfo>> {
+    this.logger.debug(`Getting player info for ${device}`);
     const { playerInfo } = await promisifyWithOptions<any>(this.alexa.getPlayerInfo.bind(this.alexa), device);
 
     return {
@@ -397,6 +436,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   public async getSounds(): Promise<Sound[]> {
+    this.logger.debug('Getting sounds');
     try {
       let sounds = this.cache.get<any[]>('sounds');
 
@@ -418,6 +458,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   public async getRoutines(): Promise<any[]> {
+    this.logger.debug('Getting routines');
     try {
       let routines = this.cache.get<any[]>('routines');
 
@@ -439,6 +480,30 @@ export class AlexaApi extends Homey.SimpleClass {
     } catch (e) {
       this.emit('error', e);
       throw e;
+    }
+  }
+
+  private async updateAllPlayers() {
+    this.logger.debug('Updating all players');
+    const devices = await this.getDevices();
+
+    for (const device of devices) {
+      const info = await this.getPlayerInfo(device.id);
+
+      this.emit('device-info', info);
+
+      if (!info.playing && device.parentGroups) {
+        for (const parentGroup of device.parentGroups) {
+          const parentInfo = await this.getPlayerInfo(parentGroup);
+
+          if (parentInfo.playing) {
+            this.emit('device-info', {
+              ...parentInfo,
+              id: device.id,
+            });
+          }
+        }
+      }
     }
   }
 }

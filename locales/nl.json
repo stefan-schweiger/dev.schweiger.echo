@@ -1,16 +1,13 @@
 {
   "settings": {
     "title": "Verbinding met Amazon-account",
-    "server": "Server",
     "page": "Amazon-website",
     "connect": "Verbinden",
     "connected": "Verbonden",
     "success": "U bent succesvol verbonden met Amazon Alexa Services.",
-    "disconnect": "Verbreken",
-    "servers": {
-      "northAmerica": "Noord-Amerika",
-      "europeIndia": "EU en India",
-      "farEast": "Verre Oosten"
-    }
+    "disconnect": "Verbreken"
+  },
+  "pair": {
+    "disconnected": "Niet verbonden met Amazon. Controleer uw verbinding in de app-instellingen."
   }
 }

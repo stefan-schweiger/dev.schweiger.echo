@@ -1,16 +1,13 @@
 {
   "settings": {
     "title": "Verbindung zum Amazon-Konto",
-    "server": "Server",
     "page": "Amazon Webseite",
     "connect": "Verbinden",
     "connected": "Verbunden",
     "success": "Sie sind erfolgreich mit den Amazon Alexa-Diensten verbunden.",
-    "disconnect": "Trennen",
-    "servers": {
-      "northAmerica": "Nordamerika",
-      "europeIndia": "EU und Indien",
-      "farEast": "Ferner Osten"
-    }
+    "disconnect": "Trennen"
+  },
+  "pair": {
+    "disconnected": "Nicht mit Amazon verbunden. Bitte überprüfe deine Verbindung in den App-Einstellungen."
   }
 }

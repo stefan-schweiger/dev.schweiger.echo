@@ -40,9 +40,9 @@ module.exports = class EchoDriver extends Homey.Driver {
   }
 
   async onPair(session: Homey.Driver.PairSession): Promise<void> {
-    if (!this.api.connected) {
-      throw new Error('Please check the connection to your Amazon account in the app settings');
-    }
+    session.setHandler('check_connection', async () => this.api.connected);
+
+    session.setHandler('list_devices', async () => await this.onPairListDevices());
   }
 
   /**

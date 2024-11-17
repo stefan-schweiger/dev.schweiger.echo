@@ -1,10 +1,10 @@
 import Homey from 'homey';
 import { AlexaApi } from './lib/api';
 import { Log } from 'homey-log';
-import { randomUUID } from 'crypto';
+import { Logger } from './lib/logger';
 
 class EchoRemoteApp extends Homey.App {
-  private homeyLog: Log | undefined;
+  private logger: Logger | undefined;
   public api: AlexaApi | undefined;
 
   private auditInterval: NodeJS.Timeout | undefined;
@@ -12,27 +12,25 @@ class EchoRemoteApp extends Homey.App {
   private getSetting = (key: string): any => this.homey.settings.get(key);
   private setSetting = (key: string, value: any): void => this.homey.settings.set(key, value);
 
-  public captureException = (error: Error) =>
-    this.getSetting('diagnosticLogging') ? this.homeyLog?.captureException(error) : console.error(error);
-
-  public captureMessage = (message: string) =>
-    this.getSetting('diagnosticLogging') ? this.homeyLog?.captureMessage(message) : console.log(message);
   /**
    * onInit is called when the app is initialized.
    */
   async onInit() {
-    this.homeyLog = new Log({ homey: this.homey });
+    const page = this.getSetting('page');
+
+    if (page?.startsWith('https://www.')) {
+      this.setSetting('page', page.replace('https://www.', ''));
+    }
+
+    this.logger = new Logger(new Log({ homey: this.homey }), this.getSetting('diagnosticLogging'), 'debug');
 
     const errorTrigger = this.homey.flow.getTriggerCard('error');
 
     const auth = this.getSetting('auth');
 
-    this.api = new AlexaApi(auth, this.captureMessage);
+    this.api = new AlexaApi(auth, this.logger);
     this.api.on('authenticated', (auth) => this.setSetting('auth', auth));
-    this.api.on('connected', async (payload) => {
-      this.log('connected', payload);
-      this.emit('connected', payload);
-    });
+    this.api.on('connected', async (payload) => this.emit('connected', payload));
 
     this.api.on('device-info', (info) => {
       this.deviceEmit(info.id, 'device-info', info);
@@ -40,15 +38,15 @@ class EchoRemoteApp extends Homey.App {
 
     this.api.on('error', (error) => {
       this.error(error);
-      this.captureException(error);
+      this.logger?.exception(error);
       errorTrigger.trigger({ error: error.message });
     });
 
     try {
       auth &&
         (await this.api.connect({
-          server: this.getSetting('server'),
-          page: this.getSetting('page'),
+          server: `alexa.${this.getSetting('page')}`,
+          page: `https://www.${this.getSetting('page')}`,
           language: this.homey.i18n.getLanguage(),
         }));
     } catch (e) {
@@ -56,14 +54,15 @@ class EchoRemoteApp extends Homey.App {
     }
 
     if (this.auditInterval) this.homey.clearInterval(this.auditInterval);
-    this.auditInterval = this.homey.setInterval(() => this.api?.audit(), 5 * 60 * 1000);
+    this.auditInterval = this.homey.setInterval(() => this.api?.checkConnection(), 5 * 60 * 1000);
   }
 
   async connect() {
-    this.api?.reset();
+    this.logger!.diagnosticLogging = this.getSetting('diagnosticLogging');
+
     return await this.api?.connect({
-      server: this.getSetting('server'),
-      page: this.getSetting('page'),
+      server: `alexa.${this.getSetting('page')}`,
+      page: `https://www.${this.getSetting('page')}`,
       language: this.homey.i18n.getLanguage(),
     });
   }

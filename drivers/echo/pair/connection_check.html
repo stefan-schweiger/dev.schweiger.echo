@@ -1,0 +1,11 @@
+<p class="homey-subtitle" data-i18n="pair.disconnected" style="text-align: center">
+  <!-- This field will be translated -->
+</p>
+
+<script type="text/javascript">
+  Homey.emit('check_connection').then(function (result) {
+    if (result) {
+      Homey.showView('list_my_devices');
+    }
+  });
+</script>

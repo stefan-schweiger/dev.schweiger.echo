@@ -10,5 +10,8 @@
   },
   "1.0.3": {
     "en": "Fixed volume control for certain devices"
+  },
+  "1.0.4": {
+    "en": "Added extended logging, better connection handling, fix pairing view"
   }
 }
