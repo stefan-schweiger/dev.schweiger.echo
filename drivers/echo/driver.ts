@@ -53,7 +53,7 @@ module.exports = class EchoDriver extends Homey.Driver {
     const devices = await this.api.getDevices();
 
     return devices
-      .filter((device) => device.model.family === 'ECHO')
+      .filter((device) => ['ECHO', 'KNIGHT', 'ROOK'].includes(device.model.family))
       .map((device) => ({
         name: device.name,
         icon:

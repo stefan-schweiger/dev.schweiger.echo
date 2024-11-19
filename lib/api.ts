@@ -24,6 +24,24 @@ const SUCCESS_HTML = `<!doctype html>
 </html>
 `;
 
+const SERVERS = {
+  'amazon.com': 'alexa.amazon.com',
+  'amazon.co.uk': 'alexa.amazon.co.uk',
+  'amazon.ca': 'alexa.amazon.ca',
+  'amazon.com.au': 'alexa.amazon.com.au',
+  'amazon.de': 'alexa.amazon.de',
+  'amazon.es': 'alexa.amazon.es',
+  'amazon.fr': 'alexa.amazon.fr',
+  'amazon.it': 'alexa.amazon.it',
+  'amazon.nl': 'alexa.amazon.nl',
+  // for whatever reason no alexa.amazon.se alias exists
+  'amazon.se': 'layla.amazon.com',
+  // for whatever reason no alexa.amazon.pl alias exists
+  'amazon.pl': 'layla.amazon.com',
+  'amazon.co.jp': 'alexa.amazon.co.jp',
+  'amazon.in': 'alexa.amazon.in',
+} as Record<string, string>;
+
 const DEVICES: Record<string, { name: string; generation: number }> = {
   AB72C64C86AW2: { name: 'Echo', generation: 1 },
   A7WXQPH584YP: { name: 'Echo', generation: 2 },
@@ -189,7 +207,7 @@ export class AlexaApi extends Homey.SimpleClass {
     this.alexa.on('ws-media-change', handleMedia);
   }
 
-  private async init(options: { cookie: any; server: string; page: string; language: string }): Promise<void> {
+  private async init(options: { cookie: any; page: string; language: string }): Promise<void> {
     const defaultOptions: Partial<InitOptions> = {
       apiUserAgentPostfix: '',
       logger: (message) => {
@@ -198,8 +216,8 @@ export class AlexaApi extends Homey.SimpleClass {
       },
       deviceAppName: 'Homey Echo Integration',
       proxyLogLevel: 'warn',
-      alexaServiceHost: options.server || undefined,
-      amazonPage: options.page || undefined,
+      alexaServiceHost: SERVERS[options.page] || undefined,
+      amazonPage: `http://www.${options.page}`,
       cookieRefreshInterval: 7 * 24 * 60 * 60 * 1000,
       usePushConnection: true,
       acceptLanguage: LANG_MAP[options.language] || 'en-US',
@@ -252,7 +270,7 @@ export class AlexaApi extends Homey.SimpleClass {
     }
   }
 
-  public async connect(options: { server: string; page: string; language: string }): Promise<ConnectionResult> {
+  public async connect(options: { page: string; language: string }): Promise<ConnectionResult> {
     let result: ConnectionResult | Error = {
       type: 'connected' as const,
     };
@@ -354,7 +372,7 @@ export class AlexaApi extends Homey.SimpleClass {
       }
 
       return (devices ?? [])
-        .filter((device: any) => device.deviceFamily === 'ECHO')
+        .filter((device: any) => ['ECHO', 'KNIGHT', 'ROOK'].includes(device.deviceFamily))
         .map(
           (device: any): Device => ({
             id: device.serialNumber,

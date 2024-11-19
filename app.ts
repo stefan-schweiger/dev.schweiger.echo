@@ -18,6 +18,7 @@ class EchoRemoteApp extends Homey.App {
   async onInit() {
     const page = this.getSetting('page');
 
+    // TODO: Remove legacy fix for settings from old versions
     if (page?.startsWith('https://www.')) {
       this.setSetting('page', page.replace('https://www.', ''));
     }
@@ -45,8 +46,7 @@ class EchoRemoteApp extends Homey.App {
     try {
       auth &&
         (await this.api.connect({
-          server: `alexa.${this.getSetting('page')}`,
-          page: `https://www.${this.getSetting('page')}`,
+          page: this.getSetting('page'),
           language: this.homey.i18n.getLanguage(),
         }));
     } catch (e) {
@@ -61,8 +61,7 @@ class EchoRemoteApp extends Homey.App {
     this.logger!.diagnosticLogging = this.getSetting('diagnosticLogging');
 
     return await this.api?.connect({
-      server: `alexa.${this.getSetting('page')}`,
-      page: `https://www.${this.getSetting('page')}`,
+      page: this.getSetting('page'),
       language: this.homey.i18n.getLanguage(),
     });
   }

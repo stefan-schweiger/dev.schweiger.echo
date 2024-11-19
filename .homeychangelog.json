@@ -13,5 +13,8 @@
   },
   "1.0.4": {
     "en": "Added extended logging, better connection handling, fix pairing view"
+  },
+  "1.0.5": {
+    "en": "Fix Echo Show devices not showing up, fix server not found for certain regions, updated device icons"
   }
 }
