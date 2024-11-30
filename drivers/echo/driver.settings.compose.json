@@ -2,14 +2,20 @@
   {
     "type": "group",
     "label": {
-      "en": "Device Information"
+      "en": "Device Information",
+      "de": "Geräteinformation",
+      "fr": "Informations sur l'appareil",
+      "nl": "Apparaatinformatie"
     },
     "children": [
       {
         "id": "serial_number",
         "type": "label",
         "label": {
-          "en": "Serial Number"
+          "en": "Serial Number",
+          "de": "Seriennummer",
+          "fr": "Numéro de série",
+          "nl": "Serienummer"
         },
         "value": ""
       },
@@ -17,7 +23,10 @@
         "id": "capabilities",
         "type": "label",
         "label": {
-          "en": "Capabilities"
+          "en": "Capabilities",
+          "de": "Fähigkeiten",
+          "fr": "Fonctionnalités",
+          "nl": "Mogelijkheden"
         },
         "value": ""
       }

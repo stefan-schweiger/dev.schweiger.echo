@@ -77,27 +77,31 @@ class EchoRemoteApp extends Homey.App {
   }
 
   private deviceEmit = async (id: string, event: string, payload: any) => {
-    const devices = this.homey.drivers.getDriver('echo').getDevices();
-    const device = devices.find((d) => d.getData().id === id);
+    try {
+      const devices = this.homey.drivers.getDriver('echo').getDevices();
+      const device = devices.find((d) => d.getData().id === id);
 
-    const apiDevices = (await this.api?.getDevices()) ?? [];
+      const apiDevices = (await this.api?.getDevices()) ?? [];
 
-    if (device) {
-      device.emit(event, payload);
-      apiDevices
-        .filter((d) => d.parentGroups?.includes(id))
-        ?.forEach((d) =>
-          this.homey.drivers
-            .getDriver('echo')
-            .getDevice({
-              id: d.id,
-            })
-            .emit(event, payload),
-        );
-    } else {
-      apiDevices
-        .filter((d) => d.parentGroups?.includes(id))
-        .forEach((x) => devices.find((d) => d.getData().id === x.id)?.emit(event, payload));
+      if (device) {
+        device.emit(event, payload);
+        apiDevices
+          .filter((d) => d.parentGroups?.includes(id))
+          ?.forEach((d) =>
+            this.homey.drivers
+              .getDriver('echo')
+              .getDevice({
+                id: d.id,
+              })
+              .emit(event, payload),
+          );
+      } else {
+        apiDevices
+          .filter((d) => d.parentGroups?.includes(id))
+          .forEach((x) => devices.find((d) => d.getData().id === x.id)?.emit(event, payload));
+      }
+    } catch (e) {
+      this.error('Error emitting device event', e);
     }
   };
 }

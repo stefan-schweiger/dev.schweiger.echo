@@ -42,6 +42,19 @@ const SERVERS = {
   'amazon.in': 'alexa.amazon.in',
 } as Record<string, string>;
 
+const LANG_MAP: Record<string, string> = {
+  de: 'de-DE',
+  en: 'en-US',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  it: 'it-IT',
+  ja: 'ja-JP',
+  nl: 'nl-NL',
+  pl: 'pl-PL',
+  se: 'sv-SE',
+  in: 'hi-IN',
+};
+
 const DEVICES: Record<string, { name: string; generation: number }> = {
   AB72C64C86AW2: { name: 'Echo', generation: 1 },
   A7WXQPH584YP: { name: 'Echo', generation: 2 },
@@ -75,6 +88,7 @@ const DEVICES: Record<string, { name: string; generation: number }> = {
 export type DeviceInfo = {
   id: string;
   volume?: number;
+  notificationVolume?: number;
   playing?: boolean;
   shuffle?: boolean | 'disabled';
   repeat?: 'track' | 'playlist' | 'none' | 'disabled';
@@ -113,16 +127,6 @@ export type ConnectionResult =
       type: 'proxy';
       url?: string;
     };
-
-const LANG_MAP: Record<string, string> = {
-  de: 'de-DE',
-  en: 'en-US',
-  es: 'es-ES',
-  fr: 'fr-FR',
-  it: 'it-IT',
-  ja: 'ja-JP',
-  nl: 'nl-NL',
-};
 
 const filterLogMessage = (message: string) => {
   if (
@@ -217,7 +221,7 @@ export class AlexaApi extends Homey.SimpleClass {
       deviceAppName: 'Homey Echo Integration',
       proxyLogLevel: 'warn',
       alexaServiceHost: SERVERS[options.page] || undefined,
-      amazonPage: `http://www.${options.page}`,
+      amazonPage: `https://www.${options.page}`,
       cookieRefreshInterval: 7 * 24 * 60 * 60 * 1000,
       usePushConnection: true,
       acceptLanguage: LANG_MAP[options.language] || 'en-US',
@@ -239,7 +243,7 @@ export class AlexaApi extends Homey.SimpleClass {
           proxyListenBind: '0.0.0.0',
           proxyPort: 3081,
           setupProxy: true,
-          amazonPageProxyLanguage: LANG_MAP[options.language].replace('-', '_') || 'en_US',
+          amazonPageProxyLanguage: LANG_MAP[options.language]?.replace('-', '_') || 'en_US',
           proxyCloseWindowHTML: SUCCESS_HTML,
         };
 
@@ -422,6 +426,27 @@ export class AlexaApi extends Homey.SimpleClass {
     return this.sendSequenceCommand(device, 'volume', volume * 100);
   }
 
+  public async getNotificationVolume(device: string): Promise<number | undefined> {
+    try {
+      const result = await promisifyWithOptions<any>(this.alexa.getDeviceNotificationState.bind(this.alexa), device);
+      return result?.volumeLevel / 100;
+    } catch (e) {
+      this.emit('error', e);
+      throw e;
+    }
+  }
+
+  public async changeNotificationVolume(device: string, volume: number) {
+    try {
+      return new Promise<any>((resolve, reject) => {
+        this.alexa.setDeviceNotificationVolume(device, volume * 100, (error, result) => (error ? reject(error) : resolve(result)));
+      });
+    } catch (e) {
+      this.emit('error', e);
+      throw e;
+    }
+  }
+
   public async changePlayback(device: string, action: 'play' | 'pause' | 'next' | 'previous' | 'repeat' | 'shuffle', value = true) {
     return this.sendCommand(device, action, value);
   }
@@ -429,11 +454,13 @@ export class AlexaApi extends Homey.SimpleClass {
   public async getPlayerInfo(device: string): Promise<Partial<DeviceInfo>> {
     this.logger.debug(`Getting player info for ${device}`);
     const { playerInfo } = await promisifyWithOptions<any>(this.alexa.getPlayerInfo.bind(this.alexa), device);
+    const notificationVolume = await this.getNotificationVolume(device);
 
     return {
       id: device,
       playing: playerInfo?.state === 'PLAYING',
       volume: isNaN(playerInfo?.volume?.volume) ? undefined : playerInfo?.volume?.volume / 100,
+      notificationVolume,
       shuffle: {
         ENABLED: true,
         DISABLED: false,

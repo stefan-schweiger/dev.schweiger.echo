@@ -1,7 +1,9 @@
-import Homey from 'homey';
+import Homey, { Image } from 'homey';
 import { AlexaApi, DeviceInfo } from '../../lib/api';
 
 module.exports = class MyDevice extends Homey.Device {
+  private albumArtImage?: Image;
+
   private get api() {
     return (this.homey.app as any).api as AlexaApi;
   }
@@ -38,6 +40,9 @@ module.exports = class MyDevice extends Homey.Device {
 
     if (capabilities.includes('VOLUME_SETTING')) {
       await this.addCapability('volume_set');
+      await this.removeCapability('volume_set.notifications');
+      // TODO: unsure what actually is influenced by this, so disable for now
+      // await this.addCapability('volume_set.notifications');
     }
     if (capabilities.includes('AUDIO_CONTROLS')) {
       await this.addCapability('speaker_playing');
@@ -51,14 +56,19 @@ module.exports = class MyDevice extends Homey.Device {
     }
 
     this.registerCapabilityListener('volume_set', async (value) => this.api.changeVolume(this.id, value));
+    this.registerCapabilityListener('volume_set.notifications', async (value) => this.api.changeNotificationVolume(this.id, value));
     this.registerCapabilityListener('speaker_playing', async (value) => this.api.changePlayback(this.id, value ? 'play' : 'pause'));
     this.registerCapabilityListener('speaker_prev', async () => this.api.changePlayback(this.id, 'previous'));
     this.registerCapabilityListener('speaker_next', async () => this.api.changePlayback(this.id, 'next'));
     this.registerCapabilityListener('speaker_shuffle', async (value) => this.api.changePlayback(this.id, 'shuffle', value));
     this.registerCapabilityListener('speaker_repeat', async (value) => this.api.changePlayback(this.id, 'repeat', value !== 'none'));
 
+    this.albumArtImage = await this.homey.images.createImage();
+    this.setAlbumArtImage(this.albumArtImage);
+
     this.on('device-info', async (payload: DeviceInfo) => {
       this.updateCapability('volume_set', payload.volume);
+      this.updateCapability('volume_set.notifications', payload.notificationVolume);
       this.updateCapability('speaker_playing', payload.playing);
       this.updateCapability('speaker_shuffle', payload.shuffle === 'disabled' ? false : payload.shuffle, payload.shuffle === 'disabled');
       this.updateCapability('speaker_repeat', payload.repeat === 'disabled' ? 'none' : payload.repeat, payload.repeat === 'disabled');
@@ -69,11 +79,8 @@ module.exports = class MyDevice extends Homey.Device {
         await this.setCapabilityValue('speaker_artist', payload.media.artist);
         await this.setCapabilityValue('speaker_album', payload.media.album);
 
-        if (payload.media.artwork) {
-          const albumArt = await this.homey.images.createImage();
-          albumArt.setUrl(payload.media.artwork);
-          this.setAlbumArtImage(albumArt);
-        }
+        this.albumArtImage?.setUrl(payload.media.artwork ?? null);
+        this.albumArtImage?.update();
       }
     });
 

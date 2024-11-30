@@ -3,35 +3,53 @@
     {
       "id": "message",
       "title": {
-        "en": "Say Message"
+        "en": "Say Message",
+        "de": "Mitteilung sagen",
+        "fr": "Dire un message",
+        "nl": "Bericht zeggen"
       },
       "titleFormatted": {
-        "en": "[[speech]] [[message]]"
+        "en": "[[speech]] [[message]]",
+        "de": "[[speech]] [[message]]",
+        "fr": "[[speech]] [[message]]",
+        "nl": "[[speech]] [[message]]"
       },
       "args": [
         {
           "type": "dropdown",
           "name": "speech",
           "placeholder": {
-            "en": "Say"
+            "en": "Say",
+            "de": "Sage",
+            "fr": "Dire",
+            "nl": "Zeg"
           },
           "values": [
             {
               "id": "speak",
               "label": {
-                "en": "Say"
+                "en": "Say",
+                "de": "Sage",
+                "fr": "Dire",
+                "nl": "Zeg"
               }
             },
             {
               "id": "announce",
               "label": {
-                "en": "Announce"
+                "en": "Announce",
+                "de": "Ankündige",
+                "fr": "Annoncer",
+                "nl": "Aankondigen"
               }
             },
             {
               "id": "whisper",
               "label": {
-                "en": "Whisper"
+                "en": "Whisper",
+                "de": "Flüstere",
+                "fr": "Chuchoter",
+                "nl": "Fluister"
               }
             }
           ]
@@ -48,17 +66,32 @@
     {
       "id": "command",
       "title": {
-        "en": "Ask custom command"
+        "en": "Tell command",
+        "de": "Befehl sagen",
+        "fr": "Dire commande",
+        "nl": "Commando zeggen"
       },
       "titleFormatted": {
-        "en": "Ask [[command]]"
+        "en": "Tell [[command]]",
+        "de": "Befehle [[command]]",
+        "fr": "Dire [[command]]",
+        "nl": "Vertel [[command]]"
+      },
+      "hint": {
+        "en": "Tell/ask the device something with the same response as if you were speaking to it.",
+        "de": "Befehle/frage das Gerät etwas mit der gleichen Rückmeldung, als ob du mit ihm sprechen würden.",
+        "fr": "Dire/demander quelque chose à l'appareil avec la même réponse que si vous lui parliez.",
+        "nl": "Vertel/vraag het apparaat iets met dezelfde reactie alsof je tegen het sprak."
       },
       "args": [
         {
           "type": "text",
           "name": "command",
           "placeholder": {
-            "en": "Command"
+            "en": "Command",
+            "de": "Befehl",
+            "fr": "Commande",
+            "nl": "Commando"
           }
         }
       ]
@@ -66,17 +99,26 @@
     {
       "id": "play-sound",
       "title": {
-        "en": "Play Sound"
+        "en": "Play Sound",
+        "de": "Ton abspielen",
+        "fr": "Jouer un son",
+        "nl": "Geluid afspelen"
       },
       "titleFormatted": {
-        "en": "Play [[sound]]"
+        "en": "Play [[sound]]",
+        "de": "Spiele [[sound]]",
+        "fr": "Jouer [[sound]]",
+        "nl": "Speel [[sound]]"
       },
       "args": [
         {
           "type": "autocomplete",
           "name": "sound",
           "placeholder": {
-            "en": "Sound"
+            "en": "Sound",
+            "de": "Ton",
+            "fr": "Son",
+            "nl": "Geluid"
           }
         }
       ]
@@ -84,17 +126,26 @@
     {
       "id": "run-routine",
       "title": {
-        "en": "Run Routine"
+        "en": "Run Routine",
+        "de": "Routine ausführen",
+        "fr": "Exécuter la routine",
+        "nl": "Routine uitvoeren"
       },
       "titleFormatted": {
-        "en": "Run [[routine]] Routine"
+        "en": "Run [[routine]] Routine",
+        "de": "Führe [[routine]] Routine aus",
+        "fr": "Exécuter la routine [[routine]]",
+        "nl": "Voer [[routine]] Routine uit"
       },
       "args": [
         {
           "type": "autocomplete",
           "name": "routine",
           "placeholder": {
-            "en": "Routine"
+            "en": "Routine",
+            "de": "Routine",
+            "fr": "Routine",
+            "nl": "Routine"
           }
         }
       ]

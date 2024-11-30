@@ -16,5 +16,8 @@
   },
   "1.0.5": {
     "en": "Fix Echo Show devices not showing up, fix server not found for certain regions, updated device icons"
+  },
+  "1.0.6": {
+    "en": "Support more languages, fix album art refresh"
   }
 }
