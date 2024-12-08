@@ -20,6 +20,16 @@
         "value": ""
       },
       {
+        "id": "model_number",
+        "type": "label",
+        "label": {
+          "en": "Model Number",
+          "de": "Modellnummer",
+          "fr": "Numéro de modèle",
+          "nl": "Modelnummer"
+        }
+      },
+      {
         "id": "capabilities",
         "type": "label",
         "label": {

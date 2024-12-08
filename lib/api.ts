@@ -212,10 +212,13 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   private async init(options: { cookie: any; page: string; language: string }): Promise<void> {
-    const defaultOptions: Partial<InitOptions> = {
+    this.logger.info(options.cookie ? 'Using cookie' : 'No cookie found');
+
+    const opts = {
+      cookie: options.cookie,
       apiUserAgentPostfix: '',
-      logger: (message) => {
-        message = filterLogMessage(message);
+      logger: (message?: string) => {
+        message = filterLogMessage(message ?? '');
         message && this.logger.debug(message);
       },
       deviceAppName: 'Homey Echo Integration',
@@ -225,27 +228,14 @@ export class AlexaApi extends Homey.SimpleClass {
       cookieRefreshInterval: 7 * 24 * 60 * 60 * 1000,
       usePushConnection: true,
       acceptLanguage: LANG_MAP[options.language] || 'en-US',
+      proxyOnly: true,
+      proxyOwnIp: IP.address('private'),
+      proxyListenBind: '0.0.0.0',
+      proxyPort: 3081,
+      setupProxy: true,
+      amazonPageProxyLanguage: LANG_MAP[options.language]?.replace('-', '_') || 'en_US',
+      proxyCloseWindowHTML: SUCCESS_HTML,
     };
-
-    this.logger.info(options.cookie ? 'Using cookie' : 'No cookie found');
-
-    const opts = options.cookie
-      ? {
-          cookie: options.cookie,
-          ...defaultOptions,
-          setupProxy: false,
-          proxyOnly: false,
-        }
-      : {
-          ...defaultOptions,
-          proxyOnly: true,
-          proxyOwnIp: IP.address('private'),
-          proxyListenBind: '0.0.0.0',
-          proxyPort: 3081,
-          setupProxy: true,
-          amazonPageProxyLanguage: LANG_MAP[options.language]?.replace('-', '_') || 'en_US',
-          proxyCloseWindowHTML: SUCCESS_HTML,
-        };
 
     await promisifyWithOptions(this.alexa.init.bind(this.alexa), { ...opts });
   }

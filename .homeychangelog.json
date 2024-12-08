@@ -19,5 +19,8 @@
   },
   "1.0.6": {
     "en": "Support more languages, fix album art refresh"
+  },
+  "1.0.7": {
+    "en": "Show model number in settings, improve re-auth, update dependencies"
   }
 }

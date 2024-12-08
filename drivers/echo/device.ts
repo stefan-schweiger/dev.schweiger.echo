@@ -31,10 +31,11 @@ module.exports = class MyDevice extends Homey.Device {
    * onInit is called when the device is initialized.
    */
   async onInit() {
-    const { capabilities } = this.getStore();
+    const { capabilities, model } = this.getStore();
 
     this.setSettings({
       serial_number: this.id,
+      model_number: model?.id,
       capabilities: capabilities.join(', '),
     });
 

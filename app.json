@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "platforms": [
@@ -351,6 +351,16 @@
                 "nl": "Serienummer"
               },
               "value": ""
+            },
+            {
+              "id": "model_number",
+              "type": "label",
+              "label": {
+                "en": "Model Number",
+                "de": "Modellnummer",
+                "fr": "Numéro de modèle",
+                "nl": "Modelnummer"
+              }
             },
             {
               "id": "capabilities",
