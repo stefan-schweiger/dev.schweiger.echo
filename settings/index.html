@@ -52,7 +52,9 @@
           </select>
         </div>
 
-        <div class="homey-form-group">
+        <!-- Disable homey logger for now because we were running into rate limiting.
+        For now people should submit diagnostic reports if they run into issues. -->
+        <!-- <div class="homey-form-group">
           <fieldset class="homey-form-checkbox-set">
             <legend class="homey-form-checkbox-set-title">Advanced settings</legend>
 
@@ -62,7 +64,7 @@
               <span class="homey-form-checkbox-text">Enable diagnostic logging</span>
             </label>
           </fieldset>
-        </div>
+        </div> -->
       </fieldset>
 
       <button id="connect" class="homey-button-primary-full" data-i18n="settings.connect"></button>
@@ -110,11 +112,11 @@
           pageElement.value = page;
         });
 
-        const diagnosticLoggingElement = document.getElementById('diagnostic-logging');
-        Homey.get('diagnosticLogging', (err, diagnosticLogging) => {
-          if (err) return Homey.alert(err);
-          diagnosticLoggingElement.checked = diagnosticLogging;
-        });
+        // const diagnosticLoggingElement = document.getElementById('diagnostic-logging');
+        // Homey.get('diagnosticLogging', (err, diagnosticLogging) => {
+        //   if (err) return Homey.alert(err);
+        //   diagnosticLoggingElement.checked = diagnosticLogging;
+        // });
 
         // Tell Homey we're ready to be displayed
         Homey.ready();
@@ -122,7 +124,7 @@
         document.getElementById('connect').addEventListener('click', (e) => {
           Promise.all([
             new Promise((r) => Homey.set('page', pageElement.value, (err) => handleResult(r, err))),
-            new Promise((r) => Homey.set('diagnosticLogging', diagnosticLoggingElement.checked, (err) => handleResult(r, err))),
+            // new Promise((r) => Homey.set('diagnosticLogging', diagnosticLoggingElement.checked, (err) => handleResult(r, err))),
           ]).then(() => {
             Homey.api('POST', '/connect', undefined, (err, res) => {
               if (err) return Homey.alert(err);

@@ -25,5 +25,8 @@
   },
   "1.0.8": {
     "en": "Parse artwork url for validity"
+  },
+  "1.0.9": {
+    "en": "Updated device icons"
   }
 }

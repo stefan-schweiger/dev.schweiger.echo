@@ -78,11 +78,12 @@ const DEVICES: Record<string, { name: string; generation: number }> = {
   A1Z88NGR2BK6A2: { name: 'Echo Show 8', generation: 1 },
   A15996VY63BQ2D: { name: 'Echo Show 8', generation: 2 },
   A2UONLFQW0PADH: { name: 'Echo Show 8', generation: 3 },
-  AIPK7MM90V7TB: { name: 'Echo Show 10', generation: 1 },
+  AWZZ5CVHX2CD: { name: 'Echo Show', generation: 2 },
+  // Echo Show was rebranded as Echo Show 10
+  AIPK7MM90V7TB: { name: 'Echo Show 10', generation: 3 },
   ASQZWP4GPYUT7: { name: 'Echo Pop', generation: 1 },
   A10A33FOX2NUBK: { name: 'Echo Spot', generation: 1 },
-  // TODO: find out correct model id
-  // ???: { name: 'Echo Spot', generation: 2 },
+  A3EH2E0YZ30OD6: { name: 'Echo Spot', generation: 2 },
 };
 
 export type DeviceInfo = {

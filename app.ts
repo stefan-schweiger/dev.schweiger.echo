@@ -23,7 +23,10 @@ class EchoRemoteApp extends Homey.App {
       this.setSetting('page', page.replace('https://www.', ''));
     }
 
-    this.logger = new Logger(new Log({ homey: this.homey }), this.getSetting('diagnosticLogging'), 'debug');
+    // Disable homey logger for now because we were running into rate limiting.
+    // For now people should submit diagnostic reports if they run into issues.
+    const homeyLogger = undefined; // new Log({ homey: this.homey });
+    this.logger = new Logger(homeyLogger, this.getSetting('diagnosticLogging'), 'debug');
 
     const errorTrigger = this.homey.flow.getTriggerCard('error');
 
