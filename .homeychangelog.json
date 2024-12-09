@@ -22,5 +22,8 @@
   },
   "1.0.7": {
     "en": "Show model number in settings, improve re-auth, update dependencies"
+  },
+  "1.0.8": {
+    "en": "Parse artwork url for validity"
   }
 }

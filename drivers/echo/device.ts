@@ -80,7 +80,12 @@ module.exports = class MyDevice extends Homey.Device {
         await this.setCapabilityValue('speaker_artist', payload.media.artist);
         await this.setCapabilityValue('speaker_album', payload.media.album);
 
-        this.albumArtImage?.setUrl(payload.media.artwork ?? null);
+        if (payload.media.artwork?.startsWith('https://')) {
+          this.albumArtImage?.setUrl(payload.media.artwork);
+        } else {
+          this.albumArtImage?.setUrl(null as any);
+        }
+
         this.albumArtImage?.update();
       }
     });
