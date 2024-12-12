@@ -81,7 +81,7 @@ class EchoRemoteApp extends Homey.App {
 
   private deviceEmit = async (id: string, event: string, payload: any) => {
     try {
-      const devices = this.homey.drivers.getDriver('echo').getDevices();
+      const devices = [...this.homey.drivers.getDriver('echo').getDevices(), ...this.homey.drivers.getDriver('group').getDevices()];
       const device = devices.find((d) => d.getData().id === id);
 
       const apiDevices = (await this.api?.getDevices()) ?? [];

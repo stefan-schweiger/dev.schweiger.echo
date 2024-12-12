@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "platforms": [
@@ -331,6 +331,114 @@
         }
       ],
       "id": "echo",
+      "settings": [
+        {
+          "type": "group",
+          "label": {
+            "en": "Device Information",
+            "de": "Geräteinformation",
+            "fr": "Informations sur l'appareil",
+            "nl": "Apparaatinformatie"
+          },
+          "children": [
+            {
+              "id": "serial_number",
+              "type": "label",
+              "label": {
+                "en": "Serial Number",
+                "de": "Seriennummer",
+                "fr": "Numéro de série",
+                "nl": "Serienummer"
+              },
+              "value": ""
+            },
+            {
+              "id": "model_number",
+              "type": "label",
+              "label": {
+                "en": "Model Number",
+                "de": "Modellnummer",
+                "fr": "Numéro de modèle",
+                "nl": "Modelnummer"
+              }
+            },
+            {
+              "id": "capabilities",
+              "type": "label",
+              "label": {
+                "en": "Capabilities",
+                "de": "Fähigkeiten",
+                "fr": "Fonctionnalités",
+                "nl": "Mogelijkheden"
+              },
+              "value": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": {
+        "en": "Group"
+      },
+      "class": "speaker",
+      "capabilities": [
+        "speaker_playing",
+        "speaker_next",
+        "speaker_prev",
+        "speaker_shuffle",
+        "speaker_repeat",
+        "speaker_artist",
+        "speaker_album",
+        "speaker_track",
+        "volume_set"
+      ],
+      "capabilitiesOptions": {
+        "volume_set": {
+          "title": {
+            "en": "Volume",
+            "de": "Lautstärke",
+            "fr": "Volume",
+            "nl": "Volume"
+          }
+        },
+        "volume_set.notifications": {
+          "title": {
+            "en": "Notification Volume",
+            "de": "Benachrichtigungslautstärke",
+            "fr": "Volume des notifications",
+            "nl": "Meldingsvolume"
+          }
+        }
+      },
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "cloud"
+      ],
+      "images": {
+        "small": "/drivers/group/assets/images/small.png",
+        "large": "/drivers/group/assets/images/large.png",
+        "xlarge": "/drivers/group/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "connection_check"
+        },
+        {
+          "id": "list_my_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_my_devices"
+          }
+        },
+        {
+          "id": "add_my_devices",
+          "template": "add_devices"
+        }
+      ],
+      "id": "group",
       "settings": [
         {
           "type": "group",

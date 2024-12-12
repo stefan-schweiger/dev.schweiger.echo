@@ -1,0 +1,58 @@
+{
+  "name": {
+    "en": "Group"
+  },
+  "class": "speaker",
+  "capabilities": [
+    "speaker_playing",
+    "speaker_next",
+    "speaker_prev",
+    "speaker_shuffle",
+    "speaker_repeat",
+    "speaker_artist",
+    "speaker_album",
+    "speaker_track",
+    "volume_set"
+  ],
+  "capabilitiesOptions": {
+    "volume_set": {
+      "title": {
+        "en": "Volume",
+        "de": "Lautstärke",
+        "fr": "Volume",
+        "nl": "Volume"
+      }
+    },
+    "volume_set.notifications": {
+      "title": {
+        "en": "Notification Volume",
+        "de": "Benachrichtigungslautstärke",
+        "fr": "Volume des notifications",
+        "nl": "Meldingsvolume"
+      }
+    }
+  },
+  "platforms": ["local"],
+  "connectivity": ["cloud"],
+  "images": {
+    "small": "{{driverAssetsPath}}/images/small.png",
+    "large": "{{driverAssetsPath}}/images/large.png",
+    "xlarge": "{{driverAssetsPath}}/images/xlarge.png"
+  },
+  "pair": [
+    {
+      "id": "connection_check"
+    },
+    {
+      "id": "list_my_devices",
+      "template": "list_devices",
+      "navigation": {
+        "next": "add_my_devices"
+      }
+    },
+    {
+      "id": "add_my_devices",
+      "template": "add_devices"
+    }
+  ]
+}

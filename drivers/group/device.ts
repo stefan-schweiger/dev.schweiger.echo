@@ -1,7 +1,7 @@
 import Homey, { Image } from 'homey';
 import { AlexaApi, DeviceInfo } from '../../lib/api';
 
-module.exports = class EchoDevice extends Homey.Device {
+module.exports = class GroupDevice extends Homey.Device {
   private albumArtImage?: Image;
 
   private get api() {

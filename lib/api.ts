@@ -367,7 +367,7 @@ export class AlexaApi extends Homey.SimpleClass {
       }
 
       return (devices ?? [])
-        .filter((device: any) => ['ECHO', 'KNIGHT', 'ROOK'].includes(device.deviceFamily))
+        .filter((device: any) => ['ECHO', 'KNIGHT', 'ROOK', 'WHA'].includes(device.deviceFamily))
         .map(
           (device: any): Device => ({
             id: device.serialNumber,

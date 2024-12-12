@@ -1,0 +1,45 @@
+[
+  {
+    "type": "group",
+    "label": {
+      "en": "Device Information",
+      "de": "Geräteinformation",
+      "fr": "Informations sur l'appareil",
+      "nl": "Apparaatinformatie"
+    },
+    "children": [
+      {
+        "id": "serial_number",
+        "type": "label",
+        "label": {
+          "en": "Serial Number",
+          "de": "Seriennummer",
+          "fr": "Numéro de série",
+          "nl": "Serienummer"
+        },
+        "value": ""
+      },
+      {
+        "id": "model_number",
+        "type": "label",
+        "label": {
+          "en": "Model Number",
+          "de": "Modellnummer",
+          "fr": "Numéro de modèle",
+          "nl": "Modelnummer"
+        }
+      },
+      {
+        "id": "capabilities",
+        "type": "label",
+        "label": {
+          "en": "Capabilities",
+          "de": "Fähigkeiten",
+          "fr": "Fonctionnalités",
+          "nl": "Mogelijkheden"
+        },
+        "value": ""
+      }
+    ]
+  }
+]

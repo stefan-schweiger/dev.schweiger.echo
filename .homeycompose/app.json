@@ -1,6 +1,6 @@
 {
   "id": "dev.schweiger.echo",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "platforms": [
