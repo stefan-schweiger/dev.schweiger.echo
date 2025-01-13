@@ -5,7 +5,8 @@
     "connect": "Connect",
     "connected": "Connected",
     "success": "You are successfully connected to Amazon Alexa Services.",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "reset": "Reset"
   },
   "pair": {
     "disconnected": "Not connected to Amazon. Please check your connection in the app settings."

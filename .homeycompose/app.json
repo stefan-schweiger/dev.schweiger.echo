@@ -1,6 +1,6 @@
 {
   "id": "dev.schweiger.echo",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "platforms": [
@@ -24,6 +24,10 @@
     "disconnect": {
       "method": "POST",
       "path": "/disconnect"
+    },
+    "reset": {
+      "method": "POST",
+      "path": "/reset"
     },
     "status": {
       "method": "GET",
@@ -72,5 +76,6 @@
   "source": "https://github.com/stefan-schweiger/dev.schweiger.echo",
   "bugs": {
     "url": "https://github.com/stefan-schweiger/dev.schweiger.echo/issues"
-  }
+  },
+  "homeyCommunityTopicId": 120365
 }

@@ -79,6 +79,11 @@ class EchoRemoteApp extends Homey.App {
     };
   }
 
+  async reset() {
+    this.setSetting('auth', undefined);
+    return this.api?.reset();
+  }
+
   private deviceEmit = async (id: string, event: string, payload: any) => {
     try {
       const devices = [...this.homey.drivers.getDriver('echo').getDevices(), ...this.homey.drivers.getDriver('group').getDevices()];

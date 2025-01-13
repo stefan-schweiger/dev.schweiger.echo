@@ -5,7 +5,8 @@
     "connect": "Connecter",
     "connected": "Connecté",
     "success": "Vous êtes connecté avec succès aux services Amazon Alexa.",
-    "disconnect": "Déconnecter"
+    "disconnect": "Déconnecter",
+    "reset": "Réinitialiser"
   },
   "pair": {
     "disconnected": "Non connecté à Amazon. Veuillez vérifier votre connexion dans les paramètres de l'application."

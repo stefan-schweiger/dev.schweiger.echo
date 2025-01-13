@@ -38,8 +38,11 @@ const SERVERS = {
   'amazon.se': 'layla.amazon.com',
   // for whatever reason no alexa.amazon.pl alias exists
   'amazon.pl': 'layla.amazon.com',
+  // for whatever reason no alexa.amazon.pl alias exists
+  'amazon.dk': 'layla.amazon.dk',
   'amazon.co.jp': 'alexa.amazon.co.jp',
   'amazon.in': 'alexa.amazon.in',
+  'amazon.com.br': 'alexa.amazon.com.br',
 } as Record<string, string>;
 
 const LANG_MAP: Record<string, string> = {
@@ -51,8 +54,10 @@ const LANG_MAP: Record<string, string> = {
   ja: 'ja-JP',
   nl: 'nl-NL',
   pl: 'pl-PL',
-  se: 'sv-SE',
+  sv: 'sv-SE',
   in: 'hi-IN',
+  no: 'no-NO',
+  da: 'da-DK',
 };
 
 const DEVICES: Record<string, { name: string; generation: number }> = {

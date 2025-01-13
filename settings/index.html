@@ -68,6 +68,7 @@
       </fieldset>
 
       <button id="connect" class="homey-button-primary-full" data-i18n="settings.connect"></button>
+      <button id="reset" class="homey-button-danger-full" data-i18n="settings.reset"></button>
     </div>
     <div id="connected-container" class="hidden">
       <h1 class="homey-title center" data-i18n="settings.connected"></h1>
@@ -138,6 +139,13 @@
 
         document.getElementById('disconnect').addEventListener('click', (e) => {
           Homey.api('POST', '/disconnect', undefined, (err) => {
+            if (err) return Homey.alert(err);
+            updateConnection(false);
+          });
+        });
+
+        document.getElementById('reset').addEventListener('click', (e) => {
+          Homey.api('POST', '/reset', undefined, (err) => {
             if (err) return Homey.alert(err);
             updateConnection(false);
           });

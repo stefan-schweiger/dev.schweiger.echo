@@ -10,3 +10,7 @@ export const disconnect = async ({ homey }: any) => {
 export const status = async ({ homey }: any) => {
   return await homey.app.status();
 };
+
+export const reset = async ({ homey }: any) => {
+  return await homey.app.reset();
+};

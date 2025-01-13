@@ -5,7 +5,8 @@
     "connect": "Verbinden",
     "connected": "Verbonden",
     "success": "U bent succesvol verbonden met Amazon Alexa Services.",
-    "disconnect": "Verbreken"
+    "disconnect": "Verbreken",
+    "reset": "Reset"
   },
   "pair": {
     "disconnected": "Niet verbonden met Amazon. Controleer uw verbinding in de app-instellingen."
