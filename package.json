@@ -15,7 +15,7 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "alexa-remote2": "^7.0.5",
+    "alexa-remote2": "^8.0.2",
     "homey-log": "^2.1.0",
     "neoip": "^3.0.1",
     "node-cache": "^5.1.2",
