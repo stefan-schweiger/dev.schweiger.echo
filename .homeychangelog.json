@@ -34,5 +34,8 @@
   },
   "1.1.1": {
     "en": "Add option to fully reset app"
+  },
+  "1.1.2": {
+    "en": "Updated underlying library for latest API changes"
   }
 }
