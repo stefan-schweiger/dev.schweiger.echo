@@ -7,6 +7,9 @@ class EchoRemoteApp extends Homey.App {
   public api: AlexaApi | undefined;
 
   private auditInterval: NodeJS.Timeout | undefined;
+  private reconnectTimer: NodeJS.Timeout | undefined;
+  private reconnectAttempts = 0;
+  private isReconnecting = false;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private getSetting = (key: string): any => this.homey.settings.get(key);
@@ -35,7 +38,14 @@ class EchoRemoteApp extends Homey.App {
 
     this.api = new AlexaApi(auth, this.logger);
     this.api.on('authenticated', (auth) => this.setSetting('auth', auth));
-    this.api.on('connected', async (payload) => this.emit('connected', payload));
+    this.api.on('connected', async (payload) => {
+      this.emit('connected', payload);
+      if (payload) {
+        this.clearReconnect();
+      } else if (this.getSetting('auth')) {
+        this.scheduleReconnect();
+      }
+    });
 
     this.api.on('device-info', (info) => {
       this.deviceEmit(info.id, 'device-info', info);
@@ -72,6 +82,7 @@ class EchoRemoteApp extends Homey.App {
   }
 
   async disconnect() {
+    this.clearReconnect();
     return this.api?.reset();
   }
 
@@ -82,8 +93,59 @@ class EchoRemoteApp extends Homey.App {
   }
 
   async reset() {
+    this.clearReconnect();
     this.setSetting('auth', undefined);
     return this.api?.reset();
+  }
+
+  private scheduleReconnect() {
+    const auth = this.getSetting('auth');
+    if (!auth || this.reconnectTimer || this.isReconnecting || this.reconnectAttempts >= 10) {
+      if (this.reconnectAttempts >= 10) {
+        this.logger?.info('Max reconnect attempts reached, giving up. User needs to re-authenticate.');
+      }
+      return;
+    }
+
+    // Exponential backoff: 30s, 1m, 2m, 4m, 8m, then cap at 15m
+    const delay = Math.min(30_000 * Math.pow(2, this.reconnectAttempts), 15 * 60_000);
+    this.logger?.info(`Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${Math.round(delay / 1000)}s`);
+
+    this.reconnectTimer = this.homey.setTimeout(async () => {
+      this.reconnectTimer = undefined;
+      this.isReconnecting = true;
+      this.reconnectAttempts++;
+
+      try {
+        const result = await this.api?.connect({
+          page: this.getSetting('page'),
+          language: this.homey.i18n.getLanguage(),
+        });
+
+        if (result?.type === 'connected') {
+          this.logger?.info('Reconnected successfully');
+          this.reconnectAttempts = 0;
+        } else if (result?.type === 'proxy') {
+          // Cookie expired — can't auto-reconnect, user must re-authenticate
+          this.logger?.info('Cookie expired, automatic reconnection not possible');
+          this.reconnectAttempts = 10; // Stop further attempts
+        }
+      } catch (e) {
+        this.logger?.info(`Reconnect attempt ${this.reconnectAttempts} failed`);
+        this.error(e);
+        this.scheduleReconnect();
+      } finally {
+        this.isReconnecting = false;
+      }
+    }, delay);
+  }
+
+  private clearReconnect() {
+    if (this.reconnectTimer) {
+      this.homey.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    this.reconnectAttempts = 0;
   }
 
   private deviceEmit = async (id: string, event: string, payload: unknown) => {

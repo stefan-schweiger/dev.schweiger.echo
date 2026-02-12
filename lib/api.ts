@@ -216,6 +216,19 @@ export class AlexaApi extends Homey.SimpleClass {
     this.alexa.on('ws-audio-player-state-change', handleMedia);
     this.alexa.on('ws-media-queue-change', handleMedia);
     this.alexa.on('ws-media-change', handleMedia);
+
+    this.alexa.on('ws-connect', () => {
+      this.logger.info('WebSocket connected');
+      this.checkConnection();
+    });
+
+    this.alexa.on('ws-disconnect', (retries: boolean, msg: string) => {
+      this.logger.info(`WebSocket disconnected: ${msg} (will retry: ${retries})`);
+      if (!retries) {
+        // Library gave up retrying, check connection status immediately
+        this.checkConnection();
+      }
+    });
   }
 
   private async init(options: { cookie: any; page: string; language: string }): Promise<void> {
@@ -234,7 +247,7 @@ export class AlexaApi extends Homey.SimpleClass {
       proxyLogLevel: 'warn',
       alexaServiceHost: SERVERS[options.page] || undefined,
       amazonPage: `https://www.${options.page}`,
-      cookieRefreshInterval: 7 * 24 * 60 * 60 * 1000,
+      cookieRefreshInterval: 4 * 24 * 60 * 60 * 1000,
       usePushConnection: true,
       acceptLanguage: LANG_MAP[options.language] || 'en-US',
       proxyOnly: true,
@@ -330,6 +343,7 @@ export class AlexaApi extends Homey.SimpleClass {
   }
 
   public async reset() {
+    this.alexa.stopProxyServer(() => {});
     this.alexa.stop();
     this.alexa.cookie = undefined;
     this.alexa.cookieData = undefined;
