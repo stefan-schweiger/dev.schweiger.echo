@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { CallbackWithErrorAndBody } from 'alexa-remote2';
 
-export function promisify<T extends any = unknown>(fn: (callback: CallbackWithErrorAndBody) => any): Promise<T> {
+export function promisify<T = any>(fn: (callback: CallbackWithErrorAndBody) => unknown): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     fn((error, result) => {
       if (error) {
@@ -12,8 +13,8 @@ export function promisify<T extends any = unknown>(fn: (callback: CallbackWithEr
   });
 }
 
-export function promisifyWithOptions<T extends any = unknown, TOptions extends any = any>(
-  fn: (options: TOptions, callback: CallbackWithErrorAndBody) => any,
+export function promisifyWithOptions<T = any, TOptions = any>(
+  fn: (options: TOptions, callback: CallbackWithErrorAndBody) => unknown,
   options: TOptions,
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {

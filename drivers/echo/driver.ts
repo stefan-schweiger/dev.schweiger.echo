@@ -3,6 +3,7 @@ import { AlexaApi } from '../../lib/api';
 
 module.exports = class EchoDriver extends Homey.Driver {
   private get api() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this.homey.app as any).api as AlexaApi;
   }
 

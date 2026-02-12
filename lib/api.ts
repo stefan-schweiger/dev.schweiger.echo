@@ -1,4 +1,5 @@
-import AlexaRemote, { InitOptions, MessageCommands, SequenceNodeCommand } from 'alexa-remote2';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import AlexaRemote, { MessageCommands, SequenceNodeCommand } from 'alexa-remote2';
 import Homey from 'homey';
 import IP from 'neoip';
 import { promisify, promisifyWithOptions, sleep } from './helpers';
@@ -146,12 +147,12 @@ const filterLogMessage = (message: string) => {
   }
 
   return message
-    .replace(/\"customerName\":\s?\".*\"/g, '"customerName":"REDACTED"')
-    .replace(/\"customerEmail\":\s?\".*\"/g, '"customerEmail":"REDACTED"')
-    .replace(/\"customerId\":\s?\".*\"/g, '"customerId":"REDACTED"')
-    .replace(/\"address[1-3]\":\s?\".*\"/g, '"address":"REDACTED"')
-    .replace(/\"deviceAddress\":\s?\".*\"/g, '"deviceAddress":"REDACTED"')
-    .replace(/\"state\":\s?\".*\"/g, '"address":"REDACTED"');
+    .replace(/"customerName":\s?".*"/g, '"customerName":"REDACTED"')
+    .replace(/"customerEmail":\s?".*"/g, '"customerEmail":"REDACTED"')
+    .replace(/"customerId":\s?".*"/g, '"customerId":"REDACTED"')
+    .replace(/"address[1-3]":\s?".*"/g, '"address":"REDACTED"')
+    .replace(/"deviceAddress":\s?".*"/g, '"deviceAddress":"REDACTED"')
+    .replace(/"state":\s?".*"/g, '"address":"REDACTED"');
 };
 
 export class AlexaApi extends Homey.SimpleClass {
@@ -225,7 +226,9 @@ export class AlexaApi extends Homey.SimpleClass {
       apiUserAgentPostfix: '',
       logger: (message?: string) => {
         message = filterLogMessage(message ?? '');
-        message && this.logger.debug(message);
+        if (message) {
+          this.logger.debug(message);
+        }
       },
       deviceAppName: 'Homey Echo Integration',
       proxyLogLevel: 'warn',

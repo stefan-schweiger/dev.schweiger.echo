@@ -5,6 +5,7 @@ module.exports = class GroupDevice extends Homey.Device {
   private albumArtImage?: Image;
 
   private get api() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this.homey.app as any).api as AlexaApi;
   }
 
@@ -12,7 +13,7 @@ module.exports = class GroupDevice extends Homey.Device {
     return this.getData().id;
   }
 
-  async updateCapability(capability: string, value: any, disabled?: boolean) {
+  async updateCapability(capability: string, value: unknown, disabled?: boolean) {
     if (value === undefined || !this.hasCapability(capability)) {
       return;
     }
@@ -76,14 +77,13 @@ module.exports = class GroupDevice extends Homey.Device {
 
       if (payload.media !== undefined) {
         await this.setCapabilityValue('speaker_track', payload.media.track);
-        this.setCapabilityOptions;
         await this.setCapabilityValue('speaker_artist', payload.media.artist);
         await this.setCapabilityValue('speaker_album', payload.media.album);
 
         if (payload.media.artwork?.startsWith('https://')) {
           this.albumArtImage?.setUrl(payload.media.artwork);
         } else {
-          this.albumArtImage?.setUrl(null as any);
+          this.albumArtImage?.setUrl(null as unknown as string);
         }
 
         this.albumArtImage?.update();

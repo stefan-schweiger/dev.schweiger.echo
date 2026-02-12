@@ -1,6 +1,5 @@
 import Homey from 'homey';
 import { AlexaApi } from './lib/api';
-import { Log } from 'homey-log';
 import { Logger } from './lib/logger';
 
 class EchoRemoteApp extends Homey.App {
@@ -9,7 +8,9 @@ class EchoRemoteApp extends Homey.App {
 
   private auditInterval: NodeJS.Timeout | undefined;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private getSetting = (key: string): any => this.homey.settings.get(key);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private setSetting = (key: string, value: any): void => this.homey.settings.set(key, value);
 
   /**
@@ -47,11 +48,12 @@ class EchoRemoteApp extends Homey.App {
     });
 
     try {
-      auth &&
-        (await this.api.connect({
+      if (auth) {
+        await this.api.connect({
           page: this.getSetting('page'),
           language: this.homey.i18n.getLanguage(),
-        }));
+        });
+      }
     } catch (e) {
       this.error(e);
     }
@@ -84,7 +86,7 @@ class EchoRemoteApp extends Homey.App {
     return this.api?.reset();
   }
 
-  private deviceEmit = async (id: string, event: string, payload: any) => {
+  private deviceEmit = async (id: string, event: string, payload: unknown) => {
     try {
       const devices = [...this.homey.drivers.getDriver('echo').getDevices(), ...this.homey.drivers.getDriver('group').getDevices()];
       const device = devices.find((d) => d.getData().id === id);

@@ -4,21 +4,25 @@
   "main": "app.ts",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint --ext .js,.ts --ignore-path .gitignore ."
-  },
-  "devDependencies": {
-    "@tsconfig/node16": "^16.1.6",
-    "@types/homey": "npm:homey-apps-sdk-v3-types@^0.3.12",
-    "@types/node": "^20.12.7",
-    "eslint": "^7.32.0",
-    "eslint-config-athom": "^3.1.5",
-    "typescript": "^5.4.5"
+    "lint": "eslint ."
   },
   "dependencies": {
     "alexa-remote2": "^8.0.4",
     "homey-log": "^2.1.0",
-    "neoip": "^3.0.1",
-    "node-cache": "^5.1.2",
-    "prettier": "^3.6.2"
+    "neoip": "^3.1.0",
+    "node-cache": "^5.1.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@tsconfig/node22": "^22.0.5",
+    "@types/homey": "npm:homey-apps-sdk-v3-types@^0.3.12",
+    "@types/node": "^22.19.7",
+    "@typescript-eslint/parser": "^8.55.0",
+    "eslint": "^9.39.2",
+    "eslint-config-athom": "^3.1.5",
+    "globals": "^17.3.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0"
   }
 }

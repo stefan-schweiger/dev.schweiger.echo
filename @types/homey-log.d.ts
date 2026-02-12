@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare module 'homey-log' {
   import { Homey } from 'homey';
-  import * as Raven from 'raven';
 
   interface LogOptions {
     /** Track unhandled promise rejections (not enabled by default) */

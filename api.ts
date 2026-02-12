@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // This is a helper for the settings page to handle potential connection errors correctly
 export const connect = async ({ homey }: any) => {
   return await homey.app.connect();
