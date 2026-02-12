@@ -40,5 +40,8 @@
   },
   "1.1.3": {
     "en": "Update dependencies for amazon api changes"
+  },
+  "1.2.0": {
+    "en": "Better reconnection handling and properly stop proxy server on reset"
   }
 }
