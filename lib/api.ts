@@ -44,6 +44,7 @@ const SERVERS = {
   'amazon.co.jp': 'alexa.amazon.co.jp',
   'amazon.in': 'alexa.amazon.in',
   'amazon.com.br': 'alexa.amazon.com.br',
+  'amazon.com.mx': 'alexa.amazon.com.mx',
 } as Record<string, string>;
 
 const LANG_MAP: Record<string, string> = {
