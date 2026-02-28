@@ -43,5 +43,8 @@
   },
   "1.2.0": {
     "en": "Better reconnection handling and properly stop proxy server on reset"
+  },
+  "1.2.1": {
+    "en": "Add support for amazon.com.mx"
   }
 }
