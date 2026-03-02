@@ -295,7 +295,7 @@ export class AlexaApi extends Homey.SimpleClass {
     try {
       this.logger.info('Connecting');
       const auth = this.authData;
-      this.reset();
+      this.cleanup();
       await this.init({ cookie: auth, ...options });
       this.logger.info('Done Initializing');
     } catch (e) {
@@ -343,15 +343,19 @@ export class AlexaApi extends Homey.SimpleClass {
     return result;
   }
 
-  public async reset() {
+  private cleanup() {
     this.alexa.stopProxyServer(() => {});
     this.alexa.stop();
     this.alexa.cookie = undefined;
     this.alexa.cookieData = undefined;
-    this.authData = undefined;
     this.cache.del(['devices', 'sounds', 'routines']);
     this.connected = false;
     this.emit('connected', false);
+  }
+
+  public async reset() {
+    this.cleanup();
+    this.authData = undefined;
     this.emit('authenticated', undefined);
   }
 

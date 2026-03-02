@@ -131,6 +131,7 @@ class EchoRemoteApp extends Homey.App {
           this.reconnectAttempts = 10; // Stop further attempts
         }
       } catch (e) {
+        this.isReconnecting = false;
         this.logger?.info(`Reconnect attempt ${this.reconnectAttempts} failed`);
         this.error(e);
         this.scheduleReconnect();
