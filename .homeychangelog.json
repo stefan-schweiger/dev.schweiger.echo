@@ -46,5 +46,8 @@
   },
   "1.2.1": {
     "en": "Add support for amazon.com.mx"
+  },
+  "1.3.0": {
+    "en": "Changed reconnection handling to be more resilient"
   }
 }
