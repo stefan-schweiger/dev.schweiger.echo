@@ -1,5 +1,6 @@
 import Homey from 'homey';
-import { AlexaApi } from './lib/api';
+import { AlexaApi, ConnectionState } from './lib/api';
+import { categorizeError } from './lib/connection';
 import { Logger } from './lib/logger';
 
 class EchoRemoteApp extends Homey.App {
@@ -9,7 +10,6 @@ class EchoRemoteApp extends Homey.App {
   private auditInterval: NodeJS.Timeout | undefined;
   private reconnectTimer: NodeJS.Timeout | undefined;
   private reconnectAttempts = 0;
-  private isReconnecting = false;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private getSetting = (key: string): any => this.homey.settings.get(key);
@@ -32,14 +32,28 @@ class EchoRemoteApp extends Homey.App {
     const homeyLogger = undefined; // new Log({ homey: this.homey });
     this.logger = new Logger(homeyLogger, this.getSetting('diagnosticLogging'), 'debug');
 
+    // Global error safety net
+    process.on('unhandledRejection', (reason) => {
+      this.logger?.error(`Unhandled Promise Rejection: ${reason}`);
+      if (reason instanceof Error) {
+        this.logger?.exception(reason);
+      }
+    });
+
+    process.on('uncaughtException', (error) => {
+      this.logger?.error(`Uncaught Exception: ${error.message}`);
+      this.logger?.exception(error);
+    });
+
     const errorTrigger = this.homey.flow.getTriggerCard('error');
 
     const auth = this.getSetting('auth');
+    this.logger?.info(`Startup: auth ${auth ? 'found' : 'not found'} in settings`);
 
     this.api = new AlexaApi(auth, this.logger);
     this.api.on('authenticated', (auth) => this.setSetting('auth', auth));
-    this.api.on('connected', async (payload) => {
-      this.emit('connected', payload);
+    this.api.on('connected', async (payload: boolean, reason?: string) => {
+      this.emit('connected', payload, reason);
       if (payload) {
         this.clearReconnect();
       } else if (this.getSetting('auth')) {
@@ -51,10 +65,15 @@ class EchoRemoteApp extends Homey.App {
       this.deviceEmit(info.id, 'device-info', info);
     });
 
-    this.api.on('error', (error) => {
+    this.api.on('error', (error: Error) => {
+      const categorized = categorizeError(error);
       this.error(error);
+      this.logger?.info(`Error [${categorized.type}/${categorized.category}]: ${categorized.message}`);
       this.logger?.exception(error);
-      errorTrigger.trigger({ error: error.message });
+      // "no body" responses are expected transient noise from Amazon's API — don't surface to user
+      if (categorized.type !== 'EMPTY_RESPONSE') {
+        errorTrigger.trigger({ error: categorized.message });
+      }
     });
 
     try {
@@ -66,6 +85,10 @@ class EchoRemoteApp extends Homey.App {
       }
     } catch (e) {
       this.error(e);
+      // Initial connect failed (e.g. transient 400 from Amazon) — schedule retry
+      if (this.getSetting('auth')) {
+        this.scheduleReconnect();
+      }
     }
 
     if (this.auditInterval) this.homey.clearInterval(this.auditInterval);
@@ -89,6 +112,7 @@ class EchoRemoteApp extends Homey.App {
   async status() {
     return {
       connected: this.api?.connected,
+      state: this.api?.state,
     };
   }
 
@@ -100,7 +124,7 @@ class EchoRemoteApp extends Homey.App {
 
   private scheduleReconnect() {
     const auth = this.getSetting('auth');
-    if (!auth || this.reconnectTimer || this.isReconnecting || this.reconnectAttempts >= 10) {
+    if (!auth || this.reconnectTimer || this.api?.state === ConnectionState.RECONNECTING || this.reconnectAttempts >= 10) {
       if (this.reconnectAttempts >= 10) {
         this.logger?.info('Max reconnect attempts reached, giving up. User needs to re-authenticate.');
       }
@@ -113,7 +137,7 @@ class EchoRemoteApp extends Homey.App {
 
     this.reconnectTimer = this.homey.setTimeout(async () => {
       this.reconnectTimer = undefined;
-      this.isReconnecting = true;
+      this.api?.setReconnecting();
       this.reconnectAttempts++;
 
       try {
@@ -122,21 +146,23 @@ class EchoRemoteApp extends Homey.App {
           language: this.homey.i18n.getLanguage(),
         });
 
-        if (result?.type === 'connected') {
-          this.logger?.info('Reconnected successfully');
-          this.reconnectAttempts = 0;
-        } else if (result?.type === 'proxy') {
+        if (result?.type === 'proxy') {
           // Cookie expired — can't auto-reconnect, user must re-authenticate
           this.logger?.info('Cookie expired, automatic reconnection not possible');
           this.reconnectAttempts = 10; // Stop further attempts
+        } else if (this.api?.state === ConnectionState.CONNECTED) {
+          this.logger?.info('Reconnected successfully');
+          this.reconnectAttempts = 0;
+        } else {
+          // connect() returned without throwing but we're not actually connected
+          // (e.g. reachability or auth check failed) — keep retrying
+          this.logger?.info(`Reconnect attempt ${this.reconnectAttempts} did not restore connection`);
+          this.scheduleReconnect();
         }
       } catch (e) {
-        this.isReconnecting = false;
         this.logger?.info(`Reconnect attempt ${this.reconnectAttempts} failed`);
         this.error(e);
         this.scheduleReconnect();
-      } finally {
-        this.isReconnecting = false;
       }
     }, delay);
   }
@@ -149,6 +175,11 @@ class EchoRemoteApp extends Homey.App {
     this.reconnectAttempts = 0;
   }
 
+  /**
+   * Route device events to the correct Homey device instance.
+   * If the target is a paired device, emit directly to it.
+   * In both cases, also propagate to any child devices whose parent group matches the id.
+   */
   private deviceEmit = async (id: string, event: string, payload: unknown) => {
     try {
       const devices = [...this.homey.drivers.getDriver('echo').getDevices(), ...this.homey.drivers.getDriver('group').getDevices()];

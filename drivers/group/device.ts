@@ -90,13 +90,18 @@ module.exports = class GroupDevice extends Homey.Device {
       }
     });
 
-    this.homey.app.on('connected', async (payload) => {
-      if (payload) {
+    this.homey.app.on('connected', async (connected: boolean, reason?: string) => {
+      if (connected) {
         await this.setAvailable();
       } else {
-        await this.setUnavailable('No connection');
+        await this.setUnavailable(reason ?? 'No connection');
       }
     });
+
+    // Set initial availability based on current connection state
+    if (!this.api.connected) {
+      await this.setUnavailable('Not connected to Amazon');
+    }
 
     this.log(`${this.getName()} with id ${this.id} has been initialized`);
   }
