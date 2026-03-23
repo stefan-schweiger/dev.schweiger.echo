@@ -33,6 +33,26 @@ Amazon US, UK, Canada, Australia, Germany, Spain, France, Italy, Netherlands, Sw
 | Play Sound | Play a notification sound (with autocomplete) |
 | Run Routine | Execute a saved Alexa routine (with autocomplete) |
 
+## Troubleshooting
+
+If you're having issues connecting or controlling your Echo devices, try these steps:
+
+1. **Enable 2FA with an authenticator app** — Amazon requires 2-step verification using an authenticator app (e.g. Google Authenticator, Microsoft Authenticator). **SMS or email-based 2FA will NOT work** — you will see an Amazon error page if this is the issue.
+
+2. **Disconnect → Reset → Restart** — Go to the Echo app settings in Homey → press **Disconnect** → press **Reset** → **Restart the app**. This clears stored authentication and allows a fresh login.
+
+3. **Verify you selected the correct Amazon website** — Make sure the Amazon region matches your account (e.g. amazon.de for Germany, amazon.co.uk for UK, amazon.com for US).
+
+4. **Uninstall conflicting Alexa apps** — If you have another Alexa Homey app installed (e.g. the "Alexa" app), disable or uninstall it — they interfere with each other's authentication.
+
+5. **Check your DNS settings** — Some routers (e.g. eero) hijack DNS and break the login. Try switching to Google DNS (`8.8.8.8`) or Cloudflare DNS (`1.1.1.1`).
+
+6. **Update the app** — Make sure you are running the latest version of the Echo app.
+
+> **Note:** Connection drops every few months are expected due to how Amazon's unofficial authentication works. Usually a disconnect/reset/restart cycle fixes it.
+
+If the issue persists after trying all steps, please [open a bug report](https://github.com/stefan-schweiger/dev.schweiger.echo/issues/new?template=bug_report.md).
+
 ## Prerequisites
 
 - [Homey Pro](https://homey.app) running firmware >= 5.0.0
