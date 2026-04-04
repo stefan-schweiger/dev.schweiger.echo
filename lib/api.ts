@@ -5,7 +5,7 @@ import { promisify, promisifyWithOptions, sleep } from './helpers';
 import Cache from 'node-cache';
 import { Logger } from './logger';
 import { ConnectionState, checkReachability, categorizeError } from './connection';
-import { SUCCESS_HTML, SERVERS, LANG_MAP, DEVICES } from './constants';
+import { SUCCESS_HTML, SERVERS, LANG_MAP, DEVICES, VOICES } from './constants';
 
 /** Homey uses 0–1 for volume, Alexa uses 0–100. */
 const toHomeyVolume = (v: number) => v / 100;
@@ -474,6 +474,16 @@ export class AlexaApi extends Homey.SimpleClass {
     }
   }
 
+  public async sayWithVoice(device: string, message: string, voiceId: string, type: 'speak' | 'whisper' = 'speak') {
+    const [voice, lang] = voiceId.split(':');
+    const content = type === 'whisper' ? `<amazon:effect name="whispered">${message}</amazon:effect>` : message;
+    return this.sendSequenceCommand(
+      device,
+      'ssml',
+      `<speak><voice name="${voice}"><lang xml:lang="${lang}">${content}</lang></voice></speak>`,
+    );
+  }
+
   public async executeCommand(device: string, message: string) {
     return this.sendSequenceCommand(device, 'textCommand', message);
   }
@@ -565,6 +575,17 @@ export class AlexaApi extends Homey.SimpleClass {
       this.emit('error', e);
       throw e;
     }
+  }
+
+  public getVoices(query?: string): { id: string; name: string }[] {
+    const voices = VOICES.map((voice) => ({
+      id: `${voice.id}:${voice.lang}`,
+      name: voice.name,
+    }));
+
+    if (!query) return voices;
+    const q = query.toLowerCase();
+    return voices.filter((voice) => voice.name.toLowerCase().includes(q));
   }
 
   public async getRoutines(): Promise<Routine[]> {

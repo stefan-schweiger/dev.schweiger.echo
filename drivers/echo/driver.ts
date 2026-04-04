@@ -12,6 +12,7 @@ module.exports = class EchoDriver extends Homey.Driver {
    */
   async onInit() {
     this.registerMessageAction();
+    this.registerMessageWithVoiceAction();
     this.registerCommandAction();
     this.registerPlaySoundAction();
     this.registerRunRoutineAction();
@@ -20,6 +21,13 @@ module.exports = class EchoDriver extends Homey.Driver {
 
   private registerMessageAction() {
     this.homey.flow.getActionCard('message').registerRunListener((args, _state) => this.api.say(args.device.id, args.message, args.speech));
+  }
+
+  private registerMessageWithVoiceAction() {
+    this.homey.flow
+      .getActionCard('message_with_voice')
+      .registerArgumentAutocompleteListener('voice', (query, _args) => this.api.getVoices(query))
+      .registerRunListener((args, _state) => this.api.sayWithVoice(args.device.id, args.message, args.voice.id, args.speech));
   }
 
   private registerCommandAction() {
