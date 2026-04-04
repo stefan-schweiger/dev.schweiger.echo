@@ -1,7 +1,7 @@
 import AlexaRemote, { MessageCommands, SequenceNodeCommand, Sound as AlexaSound, Value, SequenceValue } from 'alexa-remote2';
 import Homey from 'homey';
 import IP from 'neoip';
-import { promisify, promisifyWithOptions, sleep } from './helpers';
+import { promisify, promisifyWithOptions, sleep, escapeXml } from './helpers';
 import Cache from 'node-cache';
 import { Logger } from './logger';
 import { ConnectionState, checkReachability, categorizeError } from './connection';
@@ -467,8 +467,10 @@ export class AlexaApi extends Homey.SimpleClass {
     switch (type) {
       case 'announce':
         return this.sendSequenceCommand(device, 'announcement', message);
-      case 'whisper':
-        return this.sendSequenceCommand(device, 'ssml', `<speak><amazon:effect name="whispered">${message}</amazon:effect></speak>`);
+      case 'whisper': {
+        const escaped = escapeXml(message);
+        return this.sendSequenceCommand(device, 'ssml', `<speak><amazon:effect name="whispered">${escaped}</amazon:effect></speak>`);
+      }
       default:
         return this.sendSequenceCommand(device, 'speak', message);
     }
@@ -476,7 +478,8 @@ export class AlexaApi extends Homey.SimpleClass {
 
   public async sayWithVoice(device: string, message: string, voiceId: string, type: 'speak' | 'whisper' = 'speak') {
     const [voice, lang] = voiceId.split(':');
-    const content = type === 'whisper' ? `<amazon:effect name="whispered">${message}</amazon:effect>` : message;
+    const escaped = escapeXml(message);
+    const content = type === 'whisper' ? `<amazon:effect name="whispered">${escaped}</amazon:effect>` : escaped;
     return this.sendSequenceCommand(
       device,
       'ssml',
@@ -583,9 +586,8 @@ export class AlexaApi extends Homey.SimpleClass {
       name: voice.name,
     }));
 
-    if (!query) return voices;
-    const q = query.toLowerCase();
-    return voices.filter((voice) => voice.name.toLowerCase().includes(q));
+    const filtered = query ? voices.filter((voice) => voice.name.toLowerCase().includes(query.toLowerCase())) : voices;
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   public async getRoutines(): Promise<Routine[]> {
