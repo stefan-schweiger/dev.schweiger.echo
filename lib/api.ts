@@ -237,6 +237,9 @@ export class AlexaApi extends Homey.SimpleClass {
     const isReconnect = !!options.reconnect && !!options.cookie;
     this.logger.info(isReconnect ? 'Reconnecting with saved cookie' : options.cookie ? 'Using cookie' : 'No cookie found');
 
+    // Defensive: strip protocol/www prefix in case a full URL was stored (legacy settings).
+    const page = options.page.replace(/^https?:\/\/(www\.)?/, '');
+
     // On reconnect, force the library to refresh the cookie instead of reusing
     // a potentially stale access token. The library skips refresh when
     // tokenDate < 24h, but the access token may have expired much sooner.
@@ -257,8 +260,8 @@ export class AlexaApi extends Homey.SimpleClass {
       },
       deviceAppName: 'Homey Echo Integration',
       proxyLogLevel: 'warn',
-      alexaServiceHost: SERVERS[options.page] || undefined,
-      amazonPage: `https://www.${options.page}`,
+      alexaServiceHost: SERVERS[page] || undefined,
+      amazonPage: page,
       cookieRefreshInterval: 4 * 24 * 60 * 60 * 1000,
       usePushConnection: true,
       acceptLanguage: LANG_MAP[options.language] || 'en-US',
