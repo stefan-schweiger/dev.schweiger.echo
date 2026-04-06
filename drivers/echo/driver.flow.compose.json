@@ -64,6 +64,76 @@
       ]
     },
     {
+      "id": "message_with_voice",
+      "title": {
+        "en": "Say with Voice",
+        "de": "Mit Stimme sagen",
+        "fr": "Dire avec une voix",
+        "nl": "Zeggen met stem"
+      },
+      "titleFormatted": {
+        "en": "[[speech]][[message]] with [[voice]] voice",
+        "de": "[[speech]][[message]] mit [[voice]] Stimme",
+        "fr": "[[speech]][[message]] avec la voix [[voice]]",
+        "nl": "[[speech]][[message]] met [[voice]] stem"
+      },
+      "hint": {
+        "en": "Say or whisper a message using a specific Amazon Polly voice.",
+        "de": "Sage oder flüstere eine Nachricht mit einer bestimmten Amazon Polly-Stimme.",
+        "fr": "Dites ou chuchotez un message en utilisant une voix Amazon Polly spécifique.",
+        "nl": "Zeg of fluister een bericht met een specifieke Amazon Polly-stem."
+      },
+      "args": [
+        {
+          "type": "dropdown",
+          "name": "speech",
+          "placeholder": {
+            "en": "Say",
+            "de": "Sage",
+            "fr": "Dire",
+            "nl": "Zeg"
+          },
+          "values": [
+            {
+              "id": "speak",
+              "label": {
+                "en": "Say",
+                "de": "Sage",
+                "fr": "Dire",
+                "nl": "Zeg"
+              }
+            },
+            {
+              "id": "whisper",
+              "label": {
+                "en": "Whisper",
+                "de": "Flüstere",
+                "fr": "Chuchoter",
+                "nl": "Fluister"
+              }
+            }
+          ]
+        },
+        {
+          "type": "autocomplete",
+          "name": "voice",
+          "placeholder": {
+            "en": "Voice",
+            "de": "Stimme",
+            "fr": "Voix",
+            "nl": "Stem"
+          }
+        },
+        {
+          "type": "text",
+          "name": "message",
+          "placeholder": {
+            "en": "Message"
+          }
+        }
+      ]
+    },
+    {
       "id": "command",
       "title": {
         "en": "Tell command",

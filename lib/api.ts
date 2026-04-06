@@ -1,11 +1,11 @@
 import AlexaRemote, { MessageCommands, SequenceNodeCommand, Sound as AlexaSound, Value, SequenceValue } from 'alexa-remote2';
 import Homey from 'homey';
 import IP from 'neoip';
-import { promisify, promisifyWithOptions, sleep } from './helpers';
+import { promisify, promisifyWithOptions, sleep, escapeXml } from './helpers';
 import Cache from 'node-cache';
 import { Logger } from './logger';
 import { ConnectionState, checkReachability, categorizeError } from './connection';
-import { SUCCESS_HTML, SERVERS, LANG_MAP, DEVICES } from './constants';
+import { SUCCESS_HTML, SERVERS, LANG_MAP, DEVICES, VOICES } from './constants';
 
 /** Homey uses 0–1 for volume, Alexa uses 0–100. */
 const toHomeyVolume = (v: number) => v / 100;
@@ -470,11 +470,24 @@ export class AlexaApi extends Homey.SimpleClass {
     switch (type) {
       case 'announce':
         return this.sendSequenceCommand(device, 'announcement', message);
-      case 'whisper':
-        return this.sendSequenceCommand(device, 'ssml', `<speak><amazon:effect name="whispered">${message}</amazon:effect></speak>`);
+      case 'whisper': {
+        const escaped = escapeXml(message);
+        return this.sendSequenceCommand(device, 'ssml', `<speak><amazon:effect name="whispered">${escaped}</amazon:effect></speak>`);
+      }
       default:
         return this.sendSequenceCommand(device, 'speak', message);
     }
+  }
+
+  public async sayWithVoice(device: string, message: string, voiceId: string, type: 'speak' | 'whisper' = 'speak') {
+    const [voice, lang] = voiceId.split(':');
+    const escaped = escapeXml(message);
+    const content = type === 'whisper' ? `<amazon:effect name="whispered">${escaped}</amazon:effect>` : escaped;
+    return this.sendSequenceCommand(
+      device,
+      'ssml',
+      `<speak><voice name="${voice}"><lang xml:lang="${lang}">${content}</lang></voice></speak>`,
+    );
   }
 
   public async executeCommand(device: string, message: string) {
@@ -568,6 +581,16 @@ export class AlexaApi extends Homey.SimpleClass {
       this.emit('error', e);
       throw e;
     }
+  }
+
+  public getVoices(query?: string): { id: string; name: string }[] {
+    const voices = VOICES.map((voice) => ({
+      id: `${voice.id}:${voice.lang}`,
+      name: voice.name,
+    }));
+
+    const filtered = query ? voices.filter((voice) => voice.name.toLowerCase().includes(query.toLowerCase())) : voices;
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   public async getRoutines(): Promise<Routine[]> {
