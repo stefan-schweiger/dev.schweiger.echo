@@ -52,5 +52,8 @@
   },
   "1.3.1": {
     "en": "Improved connection handling on restart and lost connections"
+  },
+  "1.3.2": {
+    "en": "Correctly show amazon.com.br and amazon.com.mx in settings"
   }
 }
