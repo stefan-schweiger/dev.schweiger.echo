@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "title": "Połączenie z kontem Amazon",
+    "connect": "Połącz",
+    "connected": "Połączono",
+    "success": "Pomyślnie połączono z usługami Amazon Alexa.",
+    "disconnect": "Rozłącz",
+    "reset": "Resetuj",
+    "email": "E-mail Amazon",
+    "password": "Hasło Amazon",
+    "otp": "Kod uwierzytelniający (OTP)",
+    "otpHint": "Wymaga weryfikacji dwuetapowej za pomocą aplikacji uwierzytelniającej. Kody SMS lub e-mail nie działają.",
+    "connecting": "Łączenie z Amazon…"
+  },
+  "pair": {
+    "disconnected": "Brak połączenia z Amazon. Sprawdź połączenie w ustawieniach aplikacji."
+  }
+}

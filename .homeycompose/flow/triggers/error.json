@@ -1,16 +1,49 @@
 {
   "title": {
-    "en": "An error occured"
+    "en": "An error occured",
+    "de": "Ein Fehler ist aufgetreten",
+    "fr": "Une erreur s'est produite",
+    "nl": "Er is een fout opgetreden",
+    "it": "Si è verificato un errore",
+    "es": "Se ha producido un error",
+    "sv": "Ett fel uppstod",
+    "no": "Det oppstod en feil",
+    "da": "Der opstod en fejl",
+    "pl": "Wystąpił błąd",
+    "ru": "Произошла ошибка",
+    "ko": "오류가 발생했습니다"
   },
   "tokens": [
     {
       "type": "string",
       "name": "error",
       "title": {
-        "en": "error"
+        "en": "error",
+        "de": "Fehler",
+        "fr": "erreur",
+        "nl": "fout",
+        "it": "errore",
+        "es": "error",
+        "sv": "fel",
+        "no": "feil",
+        "da": "fejl",
+        "pl": "błąd",
+        "ru": "ошибка",
+        "ko": "오류"
       },
       "example": {
-        "en": "Error Information"
+        "en": "Error Information",
+        "de": "Fehlerinformationen",
+        "fr": "Informations sur l'erreur",
+        "nl": "Foutinformatie",
+        "it": "Informazioni sull'errore",
+        "es": "Información del error",
+        "sv": "Felinformation",
+        "no": "Feilinformasjon",
+        "da": "Fejlinformation",
+        "pl": "Informacje o błędzie",
+        "ru": "Информация об ошибке",
+        "ko": "오류 정보"
       }
     }
   ]

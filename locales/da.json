@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "title": "Forbindelse til Amazon-konto",
+    "connect": "Forbind",
+    "connected": "Forbundet",
+    "success": "Du er nu forbundet til Amazon Alexa-tjenesterne.",
+    "disconnect": "Afbryd",
+    "reset": "Nulstil",
+    "email": "Amazon-e-mail",
+    "password": "Amazon-adgangskode",
+    "otp": "Godkendelseskode (OTP)",
+    "otpHint": "Kræver to-trins-bekræftelse med en godkendelses-app. SMS- eller e-mailkoder virker ikke.",
+    "connecting": "Forbinder til Amazon…"
+  },
+  "pair": {
+    "disconnected": "Ikke forbundet til Amazon. Tjek forbindelsen i appens indstillinger."
+  }
+}

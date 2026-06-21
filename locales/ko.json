@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "title": "Amazon 계정 연결",
+    "connect": "연결",
+    "connected": "연결됨",
+    "success": "Amazon Alexa 서비스에 성공적으로 연결되었습니다.",
+    "disconnect": "연결 해제",
+    "reset": "초기화",
+    "email": "Amazon 이메일",
+    "password": "Amazon 비밀번호",
+    "otp": "인증 앱 코드 (OTP)",
+    "otpHint": "인증 앱을 통한 2단계 인증이 필요합니다. SMS나 이메일 코드는 작동하지 않습니다.",
+    "connecting": "Amazon에 연결 중…"
+  },
+  "pair": {
+    "disconnected": "Amazon에 연결되어 있지 않습니다. 앱 설정에서 연결을 확인하세요."
+  }
+}

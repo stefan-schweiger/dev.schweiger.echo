@@ -1,4 +1,10 @@
 /env.json
 /node_modules/
 /.homeybuild/
+/.python_cache/
+/python_packages/
+__pycache__/
+*.pyc
 **/.DS_Store
+# throwaway durability spike — contains real Amazon tokens in login_data.json, never commit
+/spike/

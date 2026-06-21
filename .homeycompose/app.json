@@ -1,8 +1,10 @@
 {
   "id": "dev.schweiger.echo",
-  "version": "1.3.2",
-  "compatibility": ">=5.0.0",
+  "version": "2.0.0",
+  "compatibility": ">=13.0.0",
   "sdk": 3,
+  "runtime": "python",
+  "pythonVersion": "3.14",
   "platforms": [
     "local"
   ],
@@ -77,5 +79,8 @@
   "bugs": {
     "url": "https://github.com/stefan-schweiger/dev.schweiger.echo/issues"
   },
-  "homeyCommunityTopicId": 120365
+  "homeyCommunityTopicId": 120365,
+  "pythonPackages": [
+    "aioamazondevices==14.1.3"
+  ]
 }

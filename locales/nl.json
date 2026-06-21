@@ -1,12 +1,16 @@
 {
   "settings": {
     "title": "Verbinding met Amazon-account",
-    "page": "Amazon-website",
     "connect": "Verbinden",
     "connected": "Verbonden",
     "success": "U bent succesvol verbonden met Amazon Alexa Services.",
     "disconnect": "Verbreken",
-    "reset": "Reset"
+    "reset": "Reset",
+    "email": "Amazon-e-mail",
+    "password": "Amazon-wachtwoord",
+    "otp": "Authenticator-code (OTP)",
+    "otpHint": "Vereist tweestapsverificatie via een authenticator-app. Sms- of e-mailcodes werken niet.",
+    "connecting": "Verbinden met Amazon…"
   },
   "pair": {
     "disconnected": "Niet verbonden met Amazon. Controleer uw verbinding in de app-instellingen."

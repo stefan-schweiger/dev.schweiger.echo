@@ -10,11 +10,12 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 
 - **Device control** - Play/pause, skip tracks, adjust volume, and view now-playing info for Echo speakers and displays
 - **Text-to-speech** - Say messages, make announcements, or whisper to your Echo devices
+- **Say with Voice** - Speak (or whisper) in a specific Amazon Polly voice and language via SSML
 - **Voice commands** - Send voice commands to Echo devices remotely (same as speaking to the device)
 - **Sounds & routines** - Play notification sounds or trigger Alexa routines from Homey flows
 - **Speaker groups** - Control multi-room audio groups as a single device
-- **Real-time updates** - Volume changes, playback state, and media metadata sync via WebSocket
-- **Auto-reconnect** - Exponential backoff reconnection on connection loss (up to 10 attempts)
+- **Real-time updates** - Volume changes, playback state, and media metadata sync via a persistent HTTP/2 push connection
+- **Resilient connection** - Signs in once and keeps the session alive by refreshing it automatically
 
 ### Supported devices
 
@@ -22,58 +23,66 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 
 ### Supported regions
 
-Amazon US, UK, Canada, Australia, Germany, Spain, France, Italy, Netherlands, Sweden, Poland, Denmark, Japan, India, Brazil, and Mexico.
+Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Australia, Germany, Spain, France, Italy, Netherlands, Sweden, Poland, Denmark, Japan, India, Brazil, Mexico, and more). Your region is **detected automatically** from your account — there is no website to select.
 
 ### Flow actions
 
 | Action | Description |
 |--------|-------------|
 | Say Message | Text-to-speech with speak, announce, or whisper mode |
+| Say with Voice | Speak or whisper using a specific Amazon Polly voice (with autocomplete) |
 | Tell Command | Execute a voice command on the device |
 | Play Sound | Play a notification sound (with autocomplete) |
 | Run Routine | Execute a saved Alexa routine (with autocomplete) |
+
+## Signing in
+
+In the Echo app settings, enter your **Amazon email, password, and a one-time code from your authenticator app**, then press **Connect**. The app signs in directly — there is no browser/proxy step and no region to choose. After connecting, add your Echo devices through the standard Homey pairing flow.
+
+> **2-step verification is required.** You must have an authenticator app (e.g. Google Authenticator, Microsoft Authenticator) enabled on your Amazon account. **SMS or email codes will not work.**
 
 ## Troubleshooting
 
 If you're having issues connecting or controlling your Echo devices, try these steps:
 
-1. **Enable 2FA with an authenticator app** — Amazon requires 2-step verification using an authenticator app (e.g. Google Authenticator, Microsoft Authenticator). **SMS or email-based 2FA will NOT work** — you will see an Amazon error page if this is the issue.
+1. **Use an authenticator-app code** — Sign-in requires a time-based code from an authenticator app. SMS or email codes are not supported by Amazon's app login.
 
-2. **Disconnect → Reset → Restart** — Go to the Echo app settings in Homey → press **Disconnect** → press **Reset** → **Restart the app**. This clears stored authentication and allows a fresh login.
+2. **Re-connect** — In the Echo app settings, press **Disconnect**, then **Connect** again with your email, password, and a fresh authenticator code. (Use **Reset** to fully clear the stored session first if needed.)
 
-3. **Verify you selected the correct Amazon website** — Make sure the Amazon region matches your account (e.g. amazon.de for Germany, amazon.co.uk for UK, amazon.com for US).
+3. **Coming from an older version?** — After updating to v2, you must sign in again once (the previous login is not compatible). If you used the **Run Routine** flow card, re-select your routine, as routines are now matched by name.
 
-4. **Uninstall conflicting Alexa apps** — If you have another Alexa Homey app installed (e.g. the "Alexa" app), disable or uninstall it — they interfere with each other's authentication.
+4. **Uninstall conflicting Alexa apps** — If you have another Alexa Homey app installed (e.g. the "Alexa" app), disable or uninstall it — they can interfere with each other's authentication.
 
 5. **Check your DNS settings** — Some routers (e.g. eero) hijack DNS and break the login. Try switching to Google DNS (`8.8.8.8`) or Cloudflare DNS (`1.1.1.1`).
 
 6. **Update the app** — Make sure you are running the latest version of the Echo app.
 
-> **Note:** Connection drops every few months are expected due to how Amazon's unofficial authentication works. Usually a disconnect/reset/restart cycle fixes it.
+> **Note:** The session is refreshed automatically and is designed to stay connected for a long time. If Amazon invalidates it (e.g. after a password change or a security event), just re-connect in the app settings.
 
 If the issue persists after trying all steps, please [open a bug report](https://github.com/stefan-schweiger/dev.schweiger.echo/issues/new?template=bug_report.md).
 
-## Prerequisites
+## Prerequisites (development)
 
-- [Homey Pro](https://homey.app) running firmware >= 5.0.0
+- [Homey Pro](https://homey.app) running firmware **>= 13.0.0** (required for Python apps)
 - [Homey CLI](https://apps.developer.homey.app/the-basics/getting-started) installed globally: `npm i -g homey`
-- Node.js 22+
-- An Amazon account with at least one Echo device
+- **Docker** running locally (the CLI compiles the Python dependencies inside a build container)
+- An Amazon account with at least one Echo device and authenticator-app 2FA enabled
+
+> The app itself runs on Homey's Python runtime (CPython 3.14) — you do not install Python locally.
 
 ## Getting started
 
-1. Clone the repository and install dependencies:
+1. Clone the repository:
 
 ```sh
 git clone https://github.com/stefan-schweiger/dev.schweiger.echo.git
 cd dev.schweiger.echo
-npm install
 ```
 
-2. Build the TypeScript source:
+2. Compile and bundle the Python dependencies (requires Docker running):
 
 ```sh
-npm run build
+homey app dependencies install
 ```
 
 3. Run the app on your Homey:
@@ -82,55 +91,58 @@ npm run build
 homey app run
 ```
 
-4. In the Homey mobile app, go to the Echo app settings, select your Amazon region, and connect your Amazon account. The app starts a local proxy server for the OAuth login flow.
+4. In the Homey app, open the Echo app settings and sign in with your Amazon email, password, and an authenticator-app code.
 
 5. After connecting, add your Echo devices through the standard Homey pairing flow.
+
+> **Using Colima instead of Docker Desktop?** Point the CLI at the Colima socket and keep the build context inside your home directory (which Colima shares into its VM):
+> ```sh
+> TMPDIR="$HOME/.cache/homey-build-tmp" \
+>   homey app dependencies install --docker-socket-path "$HOME/.colima/default/docker.sock"
+> ```
 
 ## Project structure
 
 ```
 .
-├── app.ts                    # Main app entry point (lifecycle, reconnection, event routing)
-├── api.ts                    # HTTP API endpoint wrappers (connect/disconnect/reset/status)
+├── app.py                    # App entry point (lifecycle, auto-connect, push dispatch)
+├── api.py                    # Web API endpoints (connect/disconnect/reset/status)
 ├── lib/
-│   ├── api.ts                # AlexaApi class - all Alexa communication (largest module)
-│   ├── connection.ts         # ConnectionState enum, error categorization, reachability check
-│   ├── helpers.ts            # promisify utilities and sleep helper
-│   └── logger.ts             # Logging abstraction with Sentry support and PII filtering
+│   ├── alexa.py              # AlexaService - wraps aioamazondevices (login, push, commands)
+│   ├── connection.py         # ConnectionState enum + error categorization
+│   └── constants.py          # Device-icon map and Amazon Polly voice list
 ├── drivers/
 │   ├── echo/                 # Individual Echo device driver
-│   │   ├── driver.ts         # Flow action registration and device pairing
-│   │   ├── device.ts         # Capability management and real-time state updates
+│   │   ├── driver.py         # Flow action registration and device pairing
+│   │   ├── device.py         # Capability management and real-time state updates
 │   │   ├── assets/           # Device-specific SVG icons (30+ models)
 │   │   └── pair/             # Pairing HTML views
 │   └── group/                # Speaker group driver (same structure, filters WHA family)
 ├── .homeycompose/            # Homey Compose source files (generates app.json)
 ├── locales/                  # i18n translations (en, de, fr, nl)
-├── settings/                 # App settings UI (Amazon region selection & connection)
-├── @types/                   # TypeScript type declarations for untyped dependencies
-└── .homeybuild/              # Build output (generated, do not edit)
+├── settings/                 # App settings UI (email/password/OTP sign-in)
+└── python_packages/          # Pre-compiled Python dependencies (generated, do not edit)
 ```
 
 ## Architecture overview
 
-The app is built on Homey SDK v3 and uses `alexa-remote2` to communicate with Amazon's Alexa API.
+The app is built on the Homey Python Apps SDK (SDK v3) and uses [`aioamazondevices`](https://github.com/chemelli74/aioamazondevices) — the library behind Home Assistant's official Alexa Devices integration — to communicate with Amazon.
 
-**Connection flow:** The app authenticates via a local proxy-based OAuth flow. On startup, if saved credentials exist, it auto-connects. Authentication cookies are persisted in Homey settings and refreshed periodically. If the connection drops, exponential backoff reconnection kicks in (30s, 1m, 2m, 4m, 8m, up to 15m, max 10 attempts).
+**Sign-in:** A headless OAuth + device-registration flow using your email, password and an authenticator-app code. This yields a long-lived refresh token (stored in Homey settings) from which short-lived access tokens and website cookies are minted automatically — so the session keeps working without re-entering credentials.
 
-**Real-time updates:** A persistent WebSocket connection receives volume changes, playback state updates, and media metadata from Amazon. These events flow through `AlexaApi` -> `app.ts` -> individual device instances.
+**Real-time updates:** A persistent HTTP/2 push connection (Amazon's AVS directive stream) delivers volume changes, playback state, and media metadata. Events flow through `AlexaService` (`lib/alexa.py`) → `app.py` → the matching device instances (group events fan out to their cluster members).
 
-**Caching:** Device lists (5 min TTL), sounds (1 hour), and routines (1 min) are cached with `node-cache` to reduce API calls.
+**Connection handling:** On startup the app auto-connects from the stored session. The push channel reconnects on its own; a true authentication failure surfaces a re-auth prompt. Errors are categorized in [lib/connection.py](lib/connection.py) as `auth` / `network` / `transient` / `unknown`, and an `error` flow trigger card lets users automate responses to connection problems.
 
-**Error handling:** Errors from the Alexa API are categorized in [lib/connection.ts](lib/connection.ts) as `auth` (no retry), `network` (retry), `transient` (retry), or `unknown` (no retry). An `error` flow trigger card lets users automate responses to connection failures.
+**Known limitations:** Shuffle/repeat are read-only (the underlying library exposes no command to set them). Sounds come from a curated built-in list rather than a live fetch.
 
-## Scripts
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run build` | Compile TypeScript to `.homeybuild/` |
-| `npm run lint` | Run ESLint |
-| `homey app run` | Deploy and run on Homey (development) |
-| `homey app install` | Install on Homey (production) |
+| `homey app dependencies install` | Compile & bundle the Python dependencies (needs Docker) |
+| `homey app run` | Deploy and run on Homey (development; live logs) |
+| `homey app install` | Install on Homey (persistent) |
 
 ## Contributing
 

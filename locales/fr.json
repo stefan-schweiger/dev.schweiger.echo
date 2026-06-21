@@ -1,12 +1,16 @@
 {
   "settings": {
     "title": "Connexion au compte Amazon",
-    "page": "Site Web Amazon",
     "connect": "Connecter",
     "connected": "Connecté",
     "success": "Vous êtes connecté avec succès aux services Amazon Alexa.",
     "disconnect": "Déconnecter",
-    "reset": "Réinitialiser"
+    "reset": "Réinitialiser",
+    "email": "E-mail Amazon",
+    "password": "Mot de passe Amazon",
+    "otp": "Code d'authentification (OTP)",
+    "otpHint": "Nécessite la vérification en deux étapes via une application d'authentification. Les codes SMS ou e-mail ne fonctionnent pas.",
+    "connecting": "Connexion à Amazon…"
   },
   "pair": {
     "disconnected": "Non connecté à Amazon. Veuillez vérifier votre connexion dans les paramètres de l'application."
