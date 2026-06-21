@@ -1,147 +1,120 @@
 # AGENTS.md - AI Agent Guide for dev.schweiger.echo
 
-This file provides context for AI coding agents working on this project.
+This is the **single authoritative guide** for this project. `CLAUDE.md` intentionally just points here.
 
 ## What this project is
 
-A Homey smart home app (SDK v3) that integrates Amazon Echo/Alexa devices. Users can control Echo speakers and displays, send TTS messages, trigger routines, and automate playback through Homey flows. The app communicates with Amazon's Alexa API via the `alexa-remote2` library and maintains a persistent WebSocket connection for real-time state updates.
+A Homey app (**Python** Apps SDK v3, runs on Homey's CPython 3.14 runtime) that integrates Amazon Echo/Alexa devices. Users control Echo speakers and displays, send TTS, trigger routines, and automate playback through Homey flows. It talks to Amazon through **`aioamazondevices`** — the same library behind Home Assistant's official "Alexa Devices" integration — over a headless OAuth login and a persistent HTTP/2 push connection.
+
+> History: this app was previously TypeScript/Node on `alexa-remote2`. It was rewritten in Python on `aioamazondevices` in v2.0.0 for a more durable connection (Amazon was deprecating the legacy cookie web surface the old stack depended on). If you find references to `app.ts`, `lib/api.ts`, the proxy login, or `node-cache`, they are stale.
 
 ## Tech stack
 
-- **Language:** TypeScript 5.9+ targeting Node.js 22
-- **Platform:** Homey SDK v3 (`homey` package, app runs locally on Homey Pro hub)
-- **Core dependency:** `alexa-remote2` (callback-based Amazon Alexa API client)
-- **Build:** `tsc` compiles to `.homeybuild/` directory
-- **Linting:** ESLint with `eslint-config-athom` (Homey's standard config)
-- **Formatting:** Prettier
-- **No test framework** is currently configured
+- **Language/runtime:** Python (Homey runs CPython **3.14**); `"runtime": "python"`, `"pythonVersion": "3.14"` in the manifest.
+- **Core dependency:** `aioamazondevices==14.1.3` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `beautifulsoup4`, `h2`, `yarl`, …).
+- **Platform:** Homey Apps SDK v3. **Requires Homey firmware >= 13.0.0** (Python apps).
+- **No test framework.** Validate with `homey app run` against a real Homey + Amazon account.
+- Type-checking (optional, local): `homey-stubs` + pyright.
 
-## Key files and their responsibilities
+## Build & run
 
-| File | Purpose | LOC |
-|------|---------|-----|
-| `app.ts` | App lifecycle, reconnection logic, event routing between API and devices | ~195 |
-| `api.ts` (root) | Thin HTTP endpoint wrappers exposing connect/disconnect/reset/status | ~17 |
-| `lib/api.ts` | `AlexaApi` class - all Alexa communication, WebSocket listeners, device/sound/routine fetching, media control, TTS | ~614 |
-| `lib/connection.ts` | `ConnectionState` enum, error categorization (`categorizeError`), DNS reachability check | ~108 |
-| `lib/helpers.ts` | `promisify`, `promisifyWithOptions`, `sleep` utilities for callback-to-promise conversion | ~31 |
-| `lib/logger.ts` | `Logger` class with Sentry integration, PII filtering, conditional diagnostic logging | ~47 |
-| `drivers/echo/driver.ts` | Echo driver - registers 4 flow action cards (say, command, sound, routine), handles pairing | — |
-| `drivers/echo/device.ts` | Echo device - dynamic capability management, album art, real-time state sync | — |
-| `drivers/group/driver.ts` | Speaker group driver (same structure as echo, filters WHA family) | — |
-| `drivers/group/device.ts` | Speaker group device (same as echo device) | — |
+The CLI compiles Python dependencies inside a per-architecture Docker builder and bundles them into `python_packages/`.
+
+```sh
+homey app dependencies install   # compile + bundle deps (Docker required); after editing pythonPackages
+homey app run                    # dev: build, install, run, stream logs
+homey app install                # persistent install (use for long runs / soak)
+homey app dependencies add <pkg> # add a dependency (updates manifest pythonPackages + recompiles)
+```
+
+- **`app.json` is generated** from `.homeycompose/` + per-driver `*.compose.json`. Never edit `app.json` directly.
+- **Dependencies live in the manifest field `pythonPackages`** (an array of pip specifiers) — **not** `pythonDependencies` (that field is stale docs; Athom's schema only validates `pythonPackages`). A `pyproject.toml` is generated *inside the build container* from `pythonPackages`; do not keep one in the repo.
+- **Colima users:** the builder bind-mounts a temp build dir that must be inside Colima's shared `$HOME` mount, and the CLI looks for `/var/run/docker.sock`. Use:
+  ```sh
+  TMPDIR="$HOME/.cache/homey-build-tmp" \
+    homey app dependencies install --docker-socket-path "$HOME/.colima/default/docker.sock"
+  ```
+  (Pass the same env/flag to `homey app run` / `install` via `DOCKER_HOST`.)
+- **`homey app run --remote` log noise:** after a while the remote debug channel drifts and the app floods stderr with `IPCSocket._send_to_socket … was never awaited` / `send_system`. This is the debug stream dropping, **not** an app crash. For stable/long runs use `homey app install` (logs then live in Homey Developer Tools).
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `app.py` | App lifecycle; deferred auto-connect from stored session; routes push events to devices (group events fan out to cluster members); periodic `sync` heartbeat; web-api methods; `error` flow trigger. Exports `homey_export = App`. |
+| `api.py` | Web-API endpoints (`connect`/`status`/`disconnect`/`reset`); names match the manifest `api` map. `homey` is injected at call time — do **not** `from homey import Homey`. |
+| `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback), volume scaling, pairing list, sounds/routines/voices lookups. |
+| `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
+| `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say with Voice"). |
+| `drivers/echo/driver.py` | Pairing (filters `ECHO`/`KNIGHT`/`ROOK`) + flow-action registration (incl. sound/routine/voice autocompletes). |
+| `drivers/echo/device.py` | Capabilities, capability listeners, `apply_volume`/`apply_media`, album art, availability. |
+| `drivers/group/*` | Speaker-group driver/device — same structure; pairing filters the `WHA` family. |
+| `settings/index.html` | Sign-in UI: email/password/OTP form; three views (form / connecting / connected) driven by polling `/status`. |
 
 ## Architecture patterns
 
-### Homey Compose
-Source config lives in `.homeycompose/` and per-driver compose files (`driver.compose.json`, `driver.flow.compose.json`, `driver.settings.compose.json`). The `app.json` in the root is **generated** - edit the compose sources instead.
+### Package & imports
+The app is loaded as a package named **`app`** (entry module `app.app`). Use **relative imports**: `from .lib.alexa import AlexaService` in `app.py`; `from ...app import App` (under `TYPE_CHECKING`) in `drivers/*/`. Every entry module (`app.py`, each `driver.py`/`device.py`, `api.py`) defines `homey_export`. Do not import `Homey` from the top-level `homey` package (not exported) — endpoint functions receive `homey` as an argument.
+
+### Cross-component messaging (no event bus)
+The Python SDK has no supported custom EventEmitter. The app pushes to devices by looking them up and calling methods directly:
+```python
+device = self.homey.drivers.get_driver("echo").get_device({"id": serial})  # data.id == Amazon serial
+await device.apply_volume(value)
+```
+Devices reach the service via `cast(App, self.homey.app).alexa`.
 
 ### Event flow
 ```
-Amazon Alexa API (WebSocket)
-  → AlexaApi (lib/api.ts) emits 'device-info'
-    → EchoRemoteApp (app.ts) routes to correct device via deviceEmit()
-      → EchoDevice/GroupDevice updates capabilities
+Amazon (HTTP/2 AVS push)
+  → aioamazondevices on_volume_state_event / on_media_state_event
+    → AlexaService callbacks (lib/alexa.py)
+      → App dispatch (app.py): find device by serial; group events fan out to cluster members
+        → EchoDevice/GroupDevice.apply_volume / apply_media
 ```
 
-Group events propagate to member devices: when a group's state changes, `deviceEmit()` also emits to all child devices in that group.
+### Authentication & connection
+- **Sign-in (interactive):** `AmazonEchoApi(session, email, password)` → `api.login.login_mode_interactive(otp)` runs OAuth+PKCE + `POST /auth/register`, yielding a long-lived `refresh_token` (+ `macDms`, cookies). The whole `login_data` dict is stored in Homey settings under `login_data` (email under `email`). Authenticator-app TOTP is **required** (SMS/email codes don't work).
+- **Reconnect (stored):** `api.login.login_mode_stored_data()` — no credentials needed; access tokens/cookies are re-minted from the refresh token.
+- **Auto-connect is deferred** off `on_init` via `set_timeout(..., 2000)` so drivers initialize first (otherwise `on_state_change` hits "Driver Not Initialized").
+- **Login runs in the background** (`asyncio.create_task`): `connect()` returns immediately because Homey's settings web-api call times out at **10 s** while login takes **~15 s**. The settings page polls `/status` (`disconnected`/`connecting`/`connected`/`error`, plus `error` message) to drive the UI.
+- **Push:** `start_http2_processing(httpx_client, on_reauth_required=...)` opens the AVS directive stream; it reconnects itself. A true `CannotAuthenticate` triggers re-auth.
 
-### Connection state machine
-States are defined in `lib/connection.ts`:
-```
-DISCONNECTED → CONNECTING → CONNECTED
-CONNECTED → DISCONNECTING → DISCONNECTED
-CONNECTED → RECONNECTING → CONNECTING → CONNECTED
-CONNECTED → ERROR → RECONNECTING → ...
-```
+### Homey networking gotchas (important)
+The Homey app sandbox has **no IPv6 route** and **no system CA store**, so:
+- Force IPv4: `aiohttp.TCPConnector(family=socket.AF_INET)` and `httpx.AsyncHTTPTransport(local_address="0.0.0.0")` — otherwise connects fail with `ENETUNREACH`.
+- Provide CAs via `certifi`: `ssl.create_default_context(cafile=certifi.where())` — otherwise TLS fails with `CERTIFICATE_VERIFY_FAILED`.
+- A per-request `aiohttp.ClientTimeout` keeps a stalled request from hanging forever.
 
-Auto-reconnect uses exponential backoff (30s → 1m → 2m → 4m → 8m → 15m cap, max 10 attempts). Auth failures (expired cookies) stop reconnection immediately since they require user re-authentication.
+### Volume scale
+Homey uses 0–1, the Alexa API uses 0–100. Conversion lives in `lib/alexa.py`.
 
 ### Error categorization
-`categorizeError()` in `lib/connection.ts` classifies errors from `alexa-remote2`:
-- **auth** (no retry): cookie expired, 401 unauthorized
-- **network** (retry): DNS failure, connection reset, socket hang up
-- **transient** (retry): timeout, empty response, HTTP2 session invalid
-- **unknown** (no retry): unknown device, unrecognized errors
+`categorize_error()` (`lib/connection.py`) maps library exceptions: `CannotAuthenticate`/`CannotRegisterDevice` → `auth` (no retry, needs re-auth); `CannotConnect` → `network` (retry); `CannotRetrieveData` → `transient` (retry); else `unknown`. The `error` flow trigger fires for non-transient errors.
 
-### Callback-to-promise wrapping
-`alexa-remote2` uses callback-style APIs. The helpers in `lib/helpers.ts` wrap these as promises. When adding new API calls, use `promisify()` or `promisifyWithOptions()`.
-
-### Caching
-`node-cache` with different TTLs per resource type:
-- Devices: 5 minutes
-- Sounds: 60 minutes
-- Routines: 1 minute
-
-Cache is cleared on disconnect/reset.
-
-### Authentication
-Uses `alexa-remote2`'s proxy-based OAuth. The app starts a local proxy server on port 3081. The user opens the proxy URL in a browser to log in to Amazon. On success, cookie data is stored in Homey settings. Cookie refresh interval is set to 4 days.
+### SSML
+`call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.
 
 ## Driver capabilities
 
-Both `echo` and `group` drivers support these Homey capabilities:
-- `speaker_playing` - play/pause
-- `speaker_next` / `speaker_prev` - track navigation
-- `speaker_shuffle` - shuffle toggle (supports 'disabled' state)
-- `speaker_repeat` - repeat modes: track, playlist, none, disabled
-- `speaker_track` / `speaker_artist` / `speaker_album` - media metadata
-- `volume_set` - volume (0-1 scale, converted to 0-100 for Alexa API)
-- `volume_set.notifications` - notification volume (optional, dynamically added)
+Both `echo` and `group` support: `speaker_playing`, `speaker_next`/`speaker_prev`, `speaker_track`/`speaker_artist`/`speaker_album`, `volume_set`. `speaker_shuffle`/`speaker_repeat` are present but **read-only** (`setable: false`).
 
 ## Device families
-The app filters Alexa devices by `deviceFamily`:
-- `ECHO`, `KNIGHT`, `ROOK` → individual Echo devices (echo driver)
-- `WHA` (Whole Home Audio) → speaker groups (group driver)
 
-40+ Echo models are mapped in `DEVICES` constant in `lib/api.ts` with name and generation number. Unknown models still work, they just don't get a specific icon.
-
-## Supported Amazon regions
-16 regions defined in `SERVERS` constant in `lib/api.ts`. Some regions use non-standard Alexa hostnames (e.g., `amazon.se` and `amazon.pl` use `layla.amazon.com`).
-
-## Internationalization
-- App UI translations in `locales/` (en, de, fr, nl)
-- Flow card titles and capability labels translated in compose files
-- Alexa API language passed via `LANG_MAP` in `lib/api.ts` (12 languages)
+Filtered by Amazon `device_family`: `ECHO`/`KNIGHT`/`ROOK` → echo driver; `WHA` (Whole-Home Audio) → group driver. Device `data.id` is the Amazon `serial_number` (stable — existing paired devices survive the migration without re-pairing).
 
 ## Common tasks
 
-### Adding a new Amazon region
-1. Add the Amazon page → Alexa server mapping to `SERVERS` in `lib/api.ts`
-2. Add a language mapping to `LANG_MAP` if needed
-3. Add the region option to the settings UI in `settings/index.html`
+- **Add a flow action:** define it in `drivers/echo/driver.flow.compose.json`, register it in `EchoDriver.on_init` (`get_action_card(id).register_run_listener(...)`, plus `register_argument_autocomplete_listener(name, ...)` for autocompletes returning `{"name": ..., "data": {"id": ...}}`), and implement the API call in `AlexaService`.
+- **Add a capability:** add to `drivers/echo/driver.compose.json`, register the listener in `device.py:on_init`, and update it from `apply_media`/`apply_volume`.
+- **Add an Echo model icon:** add an entry to `DEVICES` in `lib/constants.py` and an SVG to `drivers/echo/assets/`.
 
-### Adding a new Echo device model
-Add an entry to the `DEVICES` constant in `lib/api.ts` with the device type ID, name, and generation. Optionally add an SVG icon to `drivers/echo/assets/`.
+## Known limitations
 
-### Adding a new flow action
-1. Define the action in `drivers/echo/driver.flow.compose.json` (and group equivalent if applicable)
-2. Register the action handler in `drivers/echo/driver.ts` `onInit()`
-3. Implement the API method in `lib/api.ts` if needed
-4. Add translations to `locales/`
+- **Shuffle/repeat are read-only** — `aioamazondevices` exposes no command to set them.
+- **Sounds** come from a curated static list (`SOUNDS_LIST` in the library), not a live fetch.
+- **Routines are triggered by name** — old "Run Routine" flows from the TS app (which stored an automationId) need the routine re-selected.
 
-### Adding a new device capability
-1. Add the capability to `drivers/echo/driver.compose.json`
-2. Register the capability listener in `drivers/echo/device.ts` `onInit()`
-3. Handle incoming state updates in the `device-info` event handler
-4. Add capability options translations if needed
+## i18n
 
-## Build and run
-
-```sh
-npm install          # Install dependencies
-npm run build        # Compile TypeScript → .homeybuild/
-npm run lint         # Run ESLint
-homey app run        # Deploy to Homey for development
-homey app install    # Install on Homey for production
-```
-
-## Important caveats
-
-- **Do not edit `app.json` directly** - it is generated from `.homeycompose/` sources. Edit the compose files instead.
-- **Do not edit files in `.homeybuild/`** - this is the compiled output directory.
-- The `alexa-remote2` library uses callbacks with non-standard signatures (e.g., `checkAuthentication` has reversed callback params). Always verify callback signatures when wrapping new methods.
-- Sentry logging (`homey-log`) is currently disabled in `app.ts` due to rate limiting. The `homeyLogger` is set to `undefined`.
-- Volume values use 0-1 scale in Homey but 0-100 in the Alexa API. Conversion happens in `lib/api.ts`.
-- The proxy server on port 3081 is used for OAuth only. It must be cleaned up properly on reset (handled in `cleanup()`).
-- PII filtering in `lib/api.ts` (`filterLogMessage`) redacts customer name, email, ID, and address from log output.
+App UI strings in `locales/` (en, de, fr, nl). Flow-card and capability labels live inline in the compose files. When adding a flow action/voice/region, update the relevant locale entries and compose labels.

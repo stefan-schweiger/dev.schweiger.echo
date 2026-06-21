@@ -10,65 +10,42 @@
       .center {
         text-align: center;
       }
+      .homey-form-group {
+        margin-bottom: 1rem;
+      }
     </style>
   </head>
   <body>
     <header class="homey-header">
-      <h1 class="homey-title" data-i18n="settings.title">
-        <!-- This will be filled with the translated string with key 'settings.title'. -->
-      </h1>
+      <h1 class="homey-title" data-i18n="settings.title"></h1>
     </header>
 
     <div id="connect-container" class="hidden">
       <fieldset class="homey-form-fieldset">
         <div class="homey-form-group">
-          <label class="homey-form-label" for="amazon-page" data-i18n="settings.page"></label>
-          <select class="homey-form-select" name="amazon-page" id="amazon-page">
-            <option value="amazon.com">amazon.com</option>
-            <option value="amazon.co.uk">amazon.co.uk</option>
-            <option value="amazon.ca">amazon.ca</option>
-            <option value="amazon.com.au">amazon.com.au</option>
-            <option value="amazon.de">amazon.de</option>
-            <option value="amazon.es">amazon.es</option>
-            <option value="amazon.fr">amazon.fr</option>
-            <option value="amazon.it">amazon.it</option>
-            <option value="amazon.nl">amazon.nl</option>
-            <option value="amazon.se">amazon.se</option>
-            <!-- no alexa.amazon.pl alias exists -->
-            <option value="amazon.pl">amazon.pl</option>
-            <option value="amazon.co.jp">amazon.co.jp</option>
-            <option value="amazon.in">amazon.in</option>
-            <option value="amazon.com.mx">amazon.com.mx</option>
-            <option value="amazon.com.br">amazon.com.br</option>
-            <!-- For now don't include all possible amazon websites since homey is only available in certain regions --->
-            <!-- <option value="amazon.cn">amazon.cn</option> -->
-            <!-- no alexa.amazon.sg alias exists -->
-            <!-- <option value="amazon.com.sg">amazon.com.sg</option> -->
-            <!-- <option value="amazon.ae">amazon.ae</option> -->
-            <!-- no alexa.amazon.com.tr alias exists -->
-            <!-- <option value="amazon.com.tr">amazon.com.tr</option> -->
-            <!-- <option value="amazon.sa">amazon.sa</option> -->
-          </select>
+          <label class="homey-form-label" for="email" data-i18n="settings.email"></label>
+          <input class="homey-form-input" type="email" id="email" autocomplete="username" />
         </div>
-
-        <!-- Disable homey logger for now because we were running into rate limiting.
-        For now people should submit diagnostic reports if they run into issues. -->
-        <!-- <div class="homey-form-group">
-          <fieldset class="homey-form-checkbox-set">
-            <legend class="homey-form-checkbox-set-title">Advanced settings</legend>
-
-            <label class="homey-form-checkbox">
-              <input class="homey-form-checkbox-input" type="checkbox" name="diagnostic-logging" id="diagnostic-logging" />
-              <span class="homey-form-checkbox-checkmark"></span>
-              <span class="homey-form-checkbox-text">Enable diagnostic logging</span>
-            </label>
-          </fieldset>
-        </div> -->
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="password" data-i18n="settings.password"></label>
+          <input class="homey-form-input" type="password" id="password" autocomplete="current-password" />
+        </div>
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="otp" data-i18n="settings.otp"></label>
+          <input class="homey-form-input" type="text" id="otp" inputmode="numeric" autocomplete="one-time-code" />
+          <p class="homey-form-hint" data-i18n="settings.otpHint"></p>
+        </div>
       </fieldset>
 
       <button id="connect" class="homey-button-primary-full" data-i18n="settings.connect"></button>
       <button id="reset" class="homey-button-danger-full" data-i18n="settings.reset"></button>
     </div>
+
+    <div id="connecting-container" class="hidden">
+      <h1 class="homey-title center" data-i18n="settings.connecting"></h1>
+      <button class="homey-button-primary-full is-loading" disabled></button>
+    </div>
+
     <div id="connected-container" class="hidden">
       <h1 class="homey-title center" data-i18n="settings.connected"></h1>
       <p class="homey-subtitle center" data-i18n="settings.success"></p>
@@ -76,77 +53,69 @@
     </div>
 
     <script type="text/javascript">
-      const updateConnection = (connected) => {
-        if (connected) {
-          document.getElementById('connect-container').classList.add('hidden');
-          document.getElementById('connected-container').classList.remove('hidden');
-        } else {
-          document.getElementById('connect-container').classList.remove('hidden');
-          document.getElementById('connected-container').classList.add('hidden');
-        }
-      };
-
-      const handleResult = (resolve, err, res) => {
-        if (err) return Homey.alert(err);
-        resolve(res);
+      const showView = (view) => {
+        document.getElementById('connect-container').classList.toggle('hidden', view !== 'form');
+        document.getElementById('connecting-container').classList.toggle('hidden', view !== 'connecting');
+        document.getElementById('connected-container').classList.toggle('hidden', view !== 'connected');
       };
 
       function onHomeyReady(Homey) {
+        // Only alert an error if it followed a connect attempt the user made on this page
+        // (avoids popping a stale error on load).
+        let attempted = false;
+
         const checkStatus = () => {
           Homey.api('GET', '/status', undefined, (err, res) => {
-            if (err) return Homey.alert(err);
-            updateConnection(res.connected);
+            if (err || !res) return;
+            if (res.state === 'connected') {
+              attempted = false;
+              showView('connected');
+            } else if (res.state === 'connecting') {
+              showView('connecting');
+            } else {
+              showView('form');
+              if (attempted && res.error) {
+                attempted = false;
+                Homey.alert(res.error);
+              }
+            }
           });
         };
 
         checkStatus();
-
-        // TODO: does not work for whatever reason
-        Homey.on('connected', (connected) => updateConnection(connected));
-        // so we use this as a workaround
-        setInterval(() => checkStatus(), 500);
-
-        const pageElement = document.getElementById('amazon-page');
-        Homey.get('page', (err, page) => {
-          if (err) return Homey.alert(err);
-          pageElement.value = page;
-        });
-
-        // const diagnosticLoggingElement = document.getElementById('diagnostic-logging');
-        // Homey.get('diagnosticLogging', (err, diagnosticLogging) => {
-        //   if (err) return Homey.alert(err);
-        //   diagnosticLoggingElement.checked = diagnosticLogging;
-        // });
-
-        // Tell Homey we're ready to be displayed
+        setInterval(checkStatus, 2000);
         Homey.ready();
 
-        document.getElementById('connect').addEventListener('click', (e) => {
-          Promise.all([
-            new Promise((r) => Homey.set('page', pageElement.value, (err) => handleResult(r, err))),
-            // new Promise((r) => Homey.set('diagnosticLogging', diagnosticLoggingElement.checked, (err) => handleResult(r, err))),
-          ]).then(() => {
-            Homey.api('POST', '/connect', undefined, (err, res) => {
-              if (err) return Homey.alert(err);
-
-              if (res.type === 'proxy') {
-                Homey.popup(res.url);
-              }
-            });
+        document.getElementById('connect').addEventListener('click', () => {
+          const body = {
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            otp: document.getElementById('otp').value,
+          };
+          attempted = true;
+          showView('connecting'); // immediate feedback; polling takes over
+          Homey.api('POST', '/connect', body, (err) => {
+            if (err) {
+              attempted = false;
+              showView('form');
+              return Homey.alert(err);
+            }
+            document.getElementById('password').value = '';
+            document.getElementById('otp').value = '';
           });
         });
 
-        document.getElementById('disconnect').addEventListener('click', (e) => {
+        document.getElementById('disconnect').addEventListener('click', () => {
           Homey.api('POST', '/disconnect', undefined, (err) => {
             if (err) return Homey.alert(err);
-            updateConnection(false);
+            showView('form');
           });
         });
 
-        document.getElementById('reset').addEventListener('click', (e) => {
+        document.getElementById('reset').addEventListener('click', () => {
           Homey.api('POST', '/reset', undefined, (err) => {
             if (err) return Homey.alert(err);
-            updateConnection(false);
+            showView('form');
           });
         });
       }

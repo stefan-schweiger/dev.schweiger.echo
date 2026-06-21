@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "title": "Connessione all'account Amazon",
+    "connect": "Connetti",
+    "connected": "Connesso",
+    "success": "Sei connesso correttamente ai servizi Amazon Alexa.",
+    "disconnect": "Disconnetti",
+    "reset": "Reimposta",
+    "email": "Email Amazon",
+    "password": "Password Amazon",
+    "otp": "Codice autenticatore (OTP)",
+    "otpHint": "Richiede la verifica in due passaggi tramite un'app di autenticazione. I codici via SMS o email non funzionano.",
+    "connecting": "Connessione ad Amazon…"
+  },
+  "pair": {
+    "disconnected": "Non connesso ad Amazon. Controlla la connessione nelle impostazioni dell'app."
+  }
+}

@@ -1,9 +1,11 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "1.3.2",
-  "compatibility": ">=5.0.0",
+  "version": "2.0.0",
+  "compatibility": ">=13.0.0",
   "sdk": 3,
+  "runtime": "python",
+  "pythonVersion": "3.14",
   "platforms": [
     "local"
   ],
@@ -79,21 +81,57 @@
     "url": "https://github.com/stefan-schweiger/dev.schweiger.echo/issues"
   },
   "homeyCommunityTopicId": 120365,
+  "pythonPackages": [
+    "aioamazondevices==14.1.3"
+  ],
   "flow": {
     "triggers": [
       {
         "title": {
-          "en": "An error occured"
+          "en": "An error occured",
+          "de": "Ein Fehler ist aufgetreten",
+          "fr": "Une erreur s'est produite",
+          "nl": "Er is een fout opgetreden",
+          "it": "Si è verificato un errore",
+          "es": "Se ha producido un error",
+          "sv": "Ett fel uppstod",
+          "no": "Det oppstod en feil",
+          "da": "Der opstod en fejl",
+          "pl": "Wystąpił błąd",
+          "ru": "Произошла ошибка",
+          "ko": "오류가 발생했습니다"
         },
         "tokens": [
           {
             "type": "string",
             "name": "error",
             "title": {
-              "en": "error"
+              "en": "error",
+              "de": "Fehler",
+              "fr": "erreur",
+              "nl": "fout",
+              "it": "errore",
+              "es": "error",
+              "sv": "fel",
+              "no": "feil",
+              "da": "fejl",
+              "pl": "błąd",
+              "ru": "ошибка",
+              "ko": "오류"
             },
             "example": {
-              "en": "Error Information"
+              "en": "Error Information",
+              "de": "Fehlerinformationen",
+              "fr": "Informations sur l'erreur",
+              "nl": "Foutinformatie",
+              "it": "Informazioni sull'errore",
+              "es": "Información del error",
+              "sv": "Felinformation",
+              "no": "Feilinformasjon",
+              "da": "Fejlinformation",
+              "pl": "Informacje o błędzie",
+              "ru": "Информация об ошибке",
+              "ko": "오류 정보"
             }
           }
         ],
@@ -107,13 +145,29 @@
           "en": "Say Message",
           "de": "Mitteilung sagen",
           "fr": "Dire un message",
-          "nl": "Bericht zeggen"
+          "nl": "Bericht zeggen",
+          "it": "Dì messaggio",
+          "es": "Decir mensaje",
+          "sv": "Säg meddelande",
+          "no": "Si melding",
+          "da": "Sig besked",
+          "pl": "Powiedz wiadomość",
+          "ru": "Произнести сообщение",
+          "ko": "메시지 말하기"
         },
         "titleFormatted": {
           "en": "[[speech]] [[message]]",
           "de": "[[speech]] [[message]]",
           "fr": "[[speech]] [[message]]",
-          "nl": "[[speech]] [[message]]"
+          "nl": "[[speech]] [[message]]",
+          "it": "[[speech]] [[message]]",
+          "es": "[[speech]] [[message]]",
+          "sv": "[[speech]] [[message]]",
+          "no": "[[speech]] [[message]]",
+          "da": "[[speech]] [[message]]",
+          "pl": "[[speech]] [[message]]",
+          "ru": "[[speech]] [[message]]",
+          "ko": "[[speech]] [[message]]"
         },
         "args": [
           {
@@ -128,7 +182,15 @@
               "en": "Say",
               "de": "Sage",
               "fr": "Dire",
-              "nl": "Zeg"
+              "nl": "Zeg",
+              "it": "Dì",
+              "es": "Decir",
+              "sv": "Säg",
+              "no": "Si",
+              "da": "Sig",
+              "pl": "Powiedz",
+              "ru": "Сказать",
+              "ko": "말하기"
             },
             "values": [
               {
@@ -137,7 +199,15 @@
                   "en": "Say",
                   "de": "Sage",
                   "fr": "Dire",
-                  "nl": "Zeg"
+                  "nl": "Zeg",
+                  "it": "Dì",
+                  "es": "Decir",
+                  "sv": "Säg",
+                  "no": "Si",
+                  "da": "Sig",
+                  "pl": "Powiedz",
+                  "ru": "Сказать",
+                  "ko": "말하기"
                 }
               },
               {
@@ -146,7 +216,15 @@
                   "en": "Announce",
                   "de": "Ankündige",
                   "fr": "Annoncer",
-                  "nl": "Aankondigen"
+                  "nl": "Aankondigen",
+                  "it": "Annuncia",
+                  "es": "Anunciar",
+                  "sv": "Tillkännage",
+                  "no": "Kunngjør",
+                  "da": "Annoncér",
+                  "pl": "Ogłoś",
+                  "ru": "Объявить",
+                  "ko": "공지"
                 }
               },
               {
@@ -155,7 +233,15 @@
                   "en": "Whisper",
                   "de": "Flüstere",
                   "fr": "Chuchoter",
-                  "nl": "Fluister"
+                  "nl": "Fluister",
+                  "it": "Sussurra",
+                  "es": "Susurrar",
+                  "sv": "Viska",
+                  "no": "Hvisk",
+                  "da": "Hvisk",
+                  "pl": "Szepnij",
+                  "ru": "Прошептать",
+                  "ko": "속삭이기"
                 }
               }
             ]
@@ -164,7 +250,160 @@
             "type": "text",
             "name": "message",
             "placeholder": {
-              "en": "Message"
+              "en": "Message",
+              "de": "Nachricht",
+              "fr": "Message",
+              "nl": "Bericht",
+              "it": "Messaggio",
+              "es": "Mensaje",
+              "sv": "Meddelande",
+              "no": "Melding",
+              "da": "Besked",
+              "pl": "Wiadomość",
+              "ru": "Сообщение",
+              "ko": "메시지"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message_with_voice",
+        "title": {
+          "en": "Say with Voice",
+          "de": "Mit Stimme sagen",
+          "fr": "Dire avec une voix",
+          "nl": "Zeggen met stem",
+          "it": "Dì con voce",
+          "es": "Decir con voz",
+          "sv": "Säg med röst",
+          "no": "Si med stemme",
+          "da": "Sig med stemme",
+          "pl": "Powiedz głosem",
+          "ru": "Сказать голосом",
+          "ko": "음성으로 말하기"
+        },
+        "titleFormatted": {
+          "en": "[[speech]][[message]] with [[voice]] voice",
+          "de": "[[speech]][[message]] mit [[voice]] Stimme",
+          "fr": "[[speech]][[message]] avec la voix [[voice]]",
+          "nl": "[[speech]][[message]] met [[voice]] stem",
+          "it": "[[speech]][[message]] con voce [[voice]]",
+          "es": "[[speech]][[message]] con voz [[voice]]",
+          "sv": "[[speech]][[message]] med rösten [[voice]]",
+          "no": "[[speech]][[message]] med stemmen [[voice]]",
+          "da": "[[speech]][[message]] med stemmen [[voice]]",
+          "pl": "[[speech]][[message]] głosem [[voice]]",
+          "ru": "[[speech]][[message]] голосом [[voice]]",
+          "ko": "[[voice]] 음성으로 [[speech]][[message]]"
+        },
+        "hint": {
+          "en": "Say or whisper a message using a specific Amazon Polly voice.",
+          "de": "Sage oder flüstere eine Nachricht mit einer bestimmten Amazon Polly-Stimme.",
+          "fr": "Dites ou chuchotez un message en utilisant une voix Amazon Polly spécifique.",
+          "nl": "Zeg of fluister een bericht met een specifieke Amazon Polly-stem.",
+          "it": "Dì o sussurra un messaggio usando una voce Amazon Polly specifica.",
+          "es": "Di o susurra un mensaje usando una voz específica de Amazon Polly.",
+          "sv": "Säg eller viska ett meddelande med en specifik Amazon Polly-röst.",
+          "no": "Si eller hvisk en melding med en bestemt Amazon Polly-stemme.",
+          "da": "Sig eller hvisk en besked med en bestemt Amazon Polly-stemme.",
+          "pl": "Powiedz lub szepnij wiadomość, używając określonego głosu Amazon Polly.",
+          "ru": "Произнесите или прошепчите сообщение определённым голосом Amazon Polly.",
+          "ko": "특정 Amazon Polly 음성으로 메시지를 말하거나 속삭입니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          },
+          {
+            "type": "dropdown",
+            "name": "speech",
+            "placeholder": {
+              "en": "Say",
+              "de": "Sage",
+              "fr": "Dire",
+              "nl": "Zeg",
+              "it": "Dì",
+              "es": "Decir",
+              "sv": "Säg",
+              "no": "Si",
+              "da": "Sig",
+              "pl": "Powiedz",
+              "ru": "Сказать",
+              "ko": "말하기"
+            },
+            "values": [
+              {
+                "id": "speak",
+                "label": {
+                  "en": "Say",
+                  "de": "Sage",
+                  "fr": "Dire",
+                  "nl": "Zeg",
+                  "it": "Dì",
+                  "es": "Decir",
+                  "sv": "Säg",
+                  "no": "Si",
+                  "da": "Sig",
+                  "pl": "Powiedz",
+                  "ru": "Сказать",
+                  "ko": "말하기"
+                }
+              },
+              {
+                "id": "whisper",
+                "label": {
+                  "en": "Whisper",
+                  "de": "Flüstere",
+                  "fr": "Chuchoter",
+                  "nl": "Fluister",
+                  "it": "Sussurra",
+                  "es": "Susurrar",
+                  "sv": "Viska",
+                  "no": "Hvisk",
+                  "da": "Hvisk",
+                  "pl": "Szepnij",
+                  "ru": "Прошептать",
+                  "ko": "속삭이기"
+                }
+              }
+            ]
+          },
+          {
+            "type": "autocomplete",
+            "name": "voice",
+            "placeholder": {
+              "en": "Voice",
+              "de": "Stimme",
+              "fr": "Voix",
+              "nl": "Stem",
+              "it": "Voce",
+              "es": "Voz",
+              "sv": "Röst",
+              "no": "Stemme",
+              "da": "Stemme",
+              "pl": "Głos",
+              "ru": "Голос",
+              "ko": "음성"
+            }
+          },
+          {
+            "type": "text",
+            "name": "message",
+            "placeholder": {
+              "en": "Message",
+              "de": "Nachricht",
+              "fr": "Message",
+              "nl": "Bericht",
+              "it": "Messaggio",
+              "es": "Mensaje",
+              "sv": "Meddelande",
+              "no": "Melding",
+              "da": "Besked",
+              "pl": "Wiadomość",
+              "ru": "Сообщение",
+              "ko": "메시지"
             }
           }
         ]
@@ -175,19 +414,43 @@
           "en": "Tell command",
           "de": "Befehl sagen",
           "fr": "Dire commande",
-          "nl": "Commando zeggen"
+          "nl": "Commando zeggen",
+          "it": "Dì comando",
+          "es": "Decir comando",
+          "sv": "Säg kommando",
+          "no": "Si kommando",
+          "da": "Sig kommando",
+          "pl": "Wydaj polecenie",
+          "ru": "Отправить команду",
+          "ko": "명령 말하기"
         },
         "titleFormatted": {
           "en": "Tell [[command]]",
           "de": "Befehle [[command]]",
           "fr": "Dire [[command]]",
-          "nl": "Vertel [[command]]"
+          "nl": "Vertel [[command]]",
+          "it": "Dì [[command]]",
+          "es": "Decir [[command]]",
+          "sv": "Säg [[command]]",
+          "no": "Si [[command]]",
+          "da": "Sig [[command]]",
+          "pl": "Powiedz [[command]]",
+          "ru": "Сказать [[command]]",
+          "ko": "[[command]] 말하기"
         },
         "hint": {
           "en": "Tell/ask the device something with the same response as if you were speaking to it.",
           "de": "Befehle/frage das Gerät etwas mit der gleichen Rückmeldung, als ob du mit ihm sprechen würden.",
           "fr": "Dire/demander quelque chose à l'appareil avec la même réponse que si vous lui parliez.",
-          "nl": "Vertel/vraag het apparaat iets met dezelfde reactie alsof je tegen het sprak."
+          "nl": "Vertel/vraag het apparaat iets met dezelfde reactie alsof je tegen het sprak.",
+          "it": "Dì o chiedi qualcosa al dispositivo ottenendo la stessa risposta come se gli parlassi direttamente.",
+          "es": "Dile o pregunta algo al dispositivo con la misma respuesta que si le hablaras directamente.",
+          "sv": "Säg eller fråga enheten något och få samma svar som om du pratade med den.",
+          "no": "Si eller spør enheten om noe og få samme svar som om du snakket til den.",
+          "da": "Sig eller spørg enheden om noget med samme svar, som hvis du talte til den.",
+          "pl": "Powiedz lub zapytaj urządzenie o coś z taką samą odpowiedzią, jakbyś mówił do niego.",
+          "ru": "Скажите или спросите устройство — ответ будет таким же, как если бы вы говорили с ним напрямую.",
+          "ko": "기기에 직접 말하는 것과 동일한 응답으로 명령하거나 질문합니다."
         },
         "args": [
           {
@@ -202,7 +465,15 @@
               "en": "Command",
               "de": "Befehl",
               "fr": "Commande",
-              "nl": "Commando"
+              "nl": "Commando",
+              "it": "Comando",
+              "es": "Comando",
+              "sv": "Kommando",
+              "no": "Kommando",
+              "da": "Kommando",
+              "pl": "Polecenie",
+              "ru": "Команда",
+              "ko": "명령"
             }
           }
         ]
@@ -213,13 +484,29 @@
           "en": "Play Sound",
           "de": "Ton abspielen",
           "fr": "Jouer un son",
-          "nl": "Geluid afspelen"
+          "nl": "Geluid afspelen",
+          "it": "Riproduci suono",
+          "es": "Reproducir sonido",
+          "sv": "Spela ljud",
+          "no": "Spill lyd",
+          "da": "Afspil lyd",
+          "pl": "Odtwórz dźwięk",
+          "ru": "Воспроизвести звук",
+          "ko": "소리 재생"
         },
         "titleFormatted": {
           "en": "Play [[sound]]",
           "de": "Spiele [[sound]]",
           "fr": "Jouer [[sound]]",
-          "nl": "Speel [[sound]]"
+          "nl": "Speel [[sound]]",
+          "it": "Riproduci [[sound]]",
+          "es": "Reproducir [[sound]]",
+          "sv": "Spela [[sound]]",
+          "no": "Spill [[sound]]",
+          "da": "Afspil [[sound]]",
+          "pl": "Odtwórz [[sound]]",
+          "ru": "Воспроизвести [[sound]]",
+          "ko": "[[sound]] 재생"
         },
         "args": [
           {
@@ -234,7 +521,15 @@
               "en": "Sound",
               "de": "Ton",
               "fr": "Son",
-              "nl": "Geluid"
+              "nl": "Geluid",
+              "it": "Suono",
+              "es": "Sonido",
+              "sv": "Ljud",
+              "no": "Lyd",
+              "da": "Lyd",
+              "pl": "Dźwięk",
+              "ru": "Звук",
+              "ko": "소리"
             }
           }
         ]
@@ -245,13 +540,29 @@
           "en": "Run Routine",
           "de": "Routine ausführen",
           "fr": "Exécuter la routine",
-          "nl": "Routine uitvoeren"
+          "nl": "Routine uitvoeren",
+          "it": "Esegui routine",
+          "es": "Ejecutar rutina",
+          "sv": "Kör rutin",
+          "no": "Kjør rutine",
+          "da": "Kør rutine",
+          "pl": "Uruchom procedurę",
+          "ru": "Запустить процедуру",
+          "ko": "루틴 실행"
         },
         "titleFormatted": {
           "en": "Run [[routine]] Routine",
           "de": "Führe [[routine]] Routine aus",
           "fr": "Exécuter la routine [[routine]]",
-          "nl": "Voer [[routine]] Routine uit"
+          "nl": "Voer [[routine]] Routine uit",
+          "it": "Esegui routine [[routine]]",
+          "es": "Ejecutar rutina [[routine]]",
+          "sv": "Kör rutinen [[routine]]",
+          "no": "Kjør rutinen [[routine]]",
+          "da": "Kør rutinen [[routine]]",
+          "pl": "Uruchom procedurę [[routine]]",
+          "ru": "Запустить процедуру [[routine]]",
+          "ko": "[[routine]] 루틴 실행"
         },
         "args": [
           {
@@ -266,7 +577,15 @@
               "en": "Routine",
               "de": "Routine",
               "fr": "Routine",
-              "nl": "Routine"
+              "nl": "Routine",
+              "it": "Routine",
+              "es": "Rutina",
+              "sv": "Rutin",
+              "no": "Rutine",
+              "da": "Rutine",
+              "pl": "Procedura",
+              "ru": "Процедура",
+              "ko": "루틴"
             }
           }
         ]

@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "title": "Anslutning till Amazon-konto",
+    "connect": "Anslut",
+    "connected": "Ansluten",
+    "success": "Du är nu ansluten till Amazon Alexa-tjänsterna.",
+    "disconnect": "Koppla från",
+    "reset": "Återställ",
+    "email": "Amazon-e-post",
+    "password": "Amazon-lösenord",
+    "otp": "Autentiseringskod (OTP)",
+    "otpHint": "Kräver tvåstegsverifiering med en autentiseringsapp. SMS- eller e-postkoder fungerar inte.",
+    "connecting": "Ansluter till Amazon…"
+  },
+  "pair": {
+    "disconnected": "Inte ansluten till Amazon. Kontrollera anslutningen i appens inställningar."
+  }
+}
