@@ -124,7 +124,7 @@ class App(app.App):
         await self._fanout(serial, lambda d: d.apply_media(media))
 
     async def _on_state_change(self, state: str, reason: Optional[str]) -> None:
-        if state == "connecting":
+        if state in ("connecting", "reconnecting"):
             return
         connected = state == "connected"
         for driver_id in ("echo", "group"):
@@ -144,6 +144,12 @@ class App(app.App):
 
     async def _report_error(self, e: Exception) -> None:
         info = categorize_error(e)
+        if info["needs_reauth"]:
+            self.log(f"[{info['category']}] {info['message']} — attempting recovery …")
+            if await self.alexa.try_recover_session():
+                self.log("Session recovered after error")
+                return
+
         self.error(f"[{info['category']}] {info['message']}")
         if info["category"] != "transient":
             await self.homey.flow.get_trigger_card("error").trigger({"error": info["message"]})
