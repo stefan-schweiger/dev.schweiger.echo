@@ -12,14 +12,6 @@ def _serial(card_arguments: Mapping[str, Any]) -> str:
     return card_arguments["device"].get_data()["id"]
 
 
-def _speech_mode(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, dict):
-        return str(value.get("id", value.get("name", "speak")))
-    return "speak"
-
-
 class EchoDriver(driver.Driver):
     @property
     def _alexa(self):
@@ -29,19 +21,14 @@ class EchoDriver(driver.Driver):
         flow = self.homey.flow
 
         async def on_message(args: Mapping[str, Any], **kwargs) -> None:
-            mode = _speech_mode(args["speech"])
-            self.log(f"Flow message: mode={mode!r}")
-            await self._alexa.say(_serial(args), args["message"], mode)
+            await self._alexa.say(_serial(args), args["message"], args["speech"])
 
         async def autocomplete_voice(query: str, **kwargs) -> list[dict]:
             return [{"name": v["name"], "data": {"id": v["id"]}} for v in self._alexa.list_voices(query)]
 
         async def on_message_with_voice(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.say_with_voice(
-                _serial(args),
-                args["message"],
-                args["voice"]["data"]["id"],
-                _speech_mode(args["speech"]),
+                _serial(args), args["message"], args["voice"]["data"]["id"], args["speech"]
             )
 
         async def on_command(args: Mapping[str, Any], **kwargs) -> None:
