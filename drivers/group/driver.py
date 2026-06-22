@@ -17,7 +17,14 @@ class GroupDriver(driver.Driver):
         self.log("GroupDriver has been initialized")
 
     async def on_pair_list_devices(self, view_data=None) -> list[dict]:
-        return await self._alexa.pairing_devices("group")
+        app = cast("App", self.homey.app)
+        app.reset_pairing_reconnect()
+        if not await app.ensure_amazon_connected():
+            self.error("Pairing: not connected to Amazon — sign in via app settings first")
+            return []
+        devices = await self._alexa.pairing_devices("group")
+        self.log(f"Pairing: {len(devices)} group device(s) found")
+        return devices
 
 
 homey_export = GroupDriver

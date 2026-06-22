@@ -41,9 +41,6 @@
   },
   "pair": [
     {
-      "id": "connection_check"
-    },
-    {
       "id": "list_my_devices",
       "template": "list_devices",
       "navigation": {

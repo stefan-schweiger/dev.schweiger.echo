@@ -12,6 +12,14 @@ def _serial(card_arguments: Mapping[str, Any]) -> str:
     return card_arguments["device"].get_data()["id"]
 
 
+def _speech_mode(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return str(value.get("id", value.get("name", "speak")))
+    return "speak"
+
+
 class EchoDriver(driver.Driver):
     @property
     def _alexa(self):
@@ -21,14 +29,19 @@ class EchoDriver(driver.Driver):
         flow = self.homey.flow
 
         async def on_message(args: Mapping[str, Any], **kwargs) -> None:
-            await self._alexa.say(_serial(args), args["message"], args["speech"])
+            mode = _speech_mode(args["speech"])
+            self.log(f"Flow message: mode={mode!r}")
+            await self._alexa.say(_serial(args), args["message"], mode)
 
         async def autocomplete_voice(query: str, **kwargs) -> list[dict]:
             return [{"name": v["name"], "data": {"id": v["id"]}} for v in self._alexa.list_voices(query)]
 
         async def on_message_with_voice(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.say_with_voice(
-                _serial(args), args["message"], args["voice"]["data"]["id"], args["speech"]
+                _serial(args),
+                args["message"],
+                args["voice"]["data"]["id"],
+                _speech_mode(args["speech"]),
             )
 
         async def on_command(args: Mapping[str, Any], **kwargs) -> None:
@@ -71,7 +84,14 @@ class EchoDriver(driver.Driver):
         self.log("EchoDriver has been initialized")
 
     async def on_pair_list_devices(self, view_data=None) -> list[dict]:
-        return await self._alexa.pairing_devices("echo")
+        app = cast("App", self.homey.app)
+        app.reset_pairing_reconnect()
+        if not await app.ensure_amazon_connected():
+            self.error("Pairing: not connected to Amazon — sign in via app settings first")
+            return []
+        devices = await self._alexa.pairing_devices("echo")
+        self.log(f"Pairing: {len(devices)} echo device(s) found")
+        return devices
 
 
 homey_export = EchoDriver
