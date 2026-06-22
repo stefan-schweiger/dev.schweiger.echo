@@ -308,23 +308,10 @@ class AlexaService:
                 return live
         return self._devices[serial]
 
-    async def _announce(self, device: AmazonDevice, message: str) -> None:
-        # AlexaAnnouncement via behaviors/preview returns HTTP 200 but often plays
-        # nothing; Alexa.Speak with a notification chime matches announce behaviour
-        # and uses the same path as speak/whisper (verified on-device).
-        ssml = (
-            '<speak><audio src="soundbank://soundlibrary/notification/'
-            'amzn_sfx_doorbell_chime_01"/>'
-            f"{escape_xml(message)}</speak>"
-        )
-        await self._api.call_alexa_speak(device, ssml)
-        self._log(f"announce: chime+speak sent to {device.serial_number}")
-
     async def say(self, serial: str, message: str, mode: str = "speak") -> None:
         device = self._device(serial)
-        self._log(f"say: mode={mode!r} serial={serial}")
         if mode == "announce":
-            await self._announce(device, message)
+            await self._api.call_alexa_announcement(device, message)
         elif mode == "whisper":
             ssml = f'<speak><amazon:effect name="whispered">{escape_xml(message)}</amazon:effect></speak>'
             await self._api.call_alexa_speak(device, ssml)
