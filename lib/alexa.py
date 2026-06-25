@@ -11,7 +11,6 @@ Volume scale: Homey uses 0-1, the Alexa API uses 0-100.
 import asyncio
 import socket
 import ssl
-import time
 from http import HTTPMethod
 from typing import Any, Awaitable, Callable, Optional
 from xml.sax.saxutils import escape as escape_xml
@@ -32,19 +31,6 @@ VOLUME_DIVISOR = 100
 SINGLE_FAMILIES = {"ECHO", "KNIGHT", "ROOK"}
 GROUP_FAMILY = "WHA"
 
-# Soft-recovery throttle. A genuine auth failure (CannotAuthenticate) makes the
-# library refresh the access token and *still* get rejected, so an unbounded
-# "refresh + restart push" loop would hammer Amazon's auth endpoint without ever
-# succeeding. Allow a few quick attempts, then fall through to a real re-auth.
-# Attempts spaced further apart than the reset window count as independent
-# incidents (the connection clearly recovered in between).
-RECOVERY_MAX_ATTEMPTS = 3
-RECOVERY_RESET_WINDOW_S = 240
-
-# Website/session cookies expire after ~24h; renewing them clears the whole
-# aiohttp cookie jar, so do it on a slow cadence rather than every heartbeat.
-COOKIE_REFRESH_INTERVAL_S = 6 * 60 * 60
-
 _PLAYBACK = {
     "play": AmazonMediaControls.Play,
     "pause": AmazonMediaControls.Pause,
@@ -61,15 +47,7 @@ class AlexaService:
         self._api: Optional[AmazonEchoApi] = None
         self._devices: dict[str, AmazonDevice] = {}
         self._push_task: Optional[asyncio.Task] = None
-        # Single mutex for everything that builds/tears down the session or
-        # restarts the push channel (connect, recover, stop). Prevents two
-        # triggers — auto-connect, pairing reconnect, recovery — from creating
-        # parallel sessions and leaking orphaned push channels.
-        self._connect_lock = asyncio.Lock()
-        self._recovery_attempts = 0
-        self._last_recovery_ts = 0.0
-        self._last_cookie_refresh_ts = 0.0
-        self._recover_tasks: set[asyncio.Task] = set()
+        self._recovery_lock = asyncio.Lock()
         self.state = "disconnected"
         self.last_error: Optional[str] = None
 
@@ -90,44 +68,25 @@ class AlexaService:
 
     # --- lifecycle -------------------------------------------------------
     async def start_from_stored(self, email: str, login_data: dict) -> None:
-        async with self._connect_lock:
-            # Another trigger may have connected while we waited for the lock.
-            if self._api is not None and self.state == "connected":
-                return
-            if self._api is not None:
-                await self._teardown()
-            await self._set_state("connecting")
-            try:
-                self._build(email, "", login_data)
-                await self._api.login.login_mode_stored_data()
-                await self._after_login()
-            except Exception:
-                # Don't leave the state stuck on "connecting" — the caller
-                # (auto-connect / pairing) decides how to surface the failure.
-                await self._set_state("disconnected")
-                raise
+        self._build(email, "", login_data)
+        await self._api.login.login_mode_stored_data()
+        await self._after_login()
 
     async def start_interactive(self, email: str, password: str, otp: str) -> dict:
-        async with self._connect_lock:
-            await self._set_state("connecting")
-            try:
-                if self._api is not None:
-                    await self._teardown()
-                self._build(email, password, None)
-                self._log("login: submitting credentials + OTP to Amazon …")
-                login_data = await self._api.login.login_mode_interactive(otp)
-                self._log("login: device registered; setting up push + fetching devices …")
-                await self._after_login()
-                self._log("login: complete")
-                return login_data
-            except Exception as e:
-                await self._set_state("error", f"{type(e).__name__}: {e}")
-                raise
+        await self._set_state("connecting")
+        try:
+            self._build(email, password, None)
+            self._log("login: submitting credentials + OTP to Amazon …")
+            login_data = await self._api.login.login_mode_interactive(otp)
+            self._log("login: device registered; setting up push + fetching devices …")
+            await self._after_login()
+            self._log("login: complete")
+            return login_data
+        except Exception as e:
+            await self._set_state("error", f"{type(e).__name__}: {e}")
+            raise
 
     def _build(self, email: str, password: str, login_data: Optional[dict]) -> None:
-        # Fresh session — let recovery have its full budget of attempts again.
-        self._recovery_attempts = 0
-        self._last_recovery_ts = 0.0
         # Homey has no IPv6 route (force IPv4) and no system CA store (use certifi's bundle).
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         self._session = aiohttp.ClientSession(
@@ -165,12 +124,6 @@ class AlexaService:
         self._watch_push_task()
 
     async def stop(self) -> None:
-        async with self._connect_lock:
-            await self._teardown()
-            await self._set_state("disconnected")
-
-    async def _teardown(self) -> None:
-        """Tear down the session and push channel. Caller must hold _connect_lock."""
         try:
             if self._api is not None:
                 await self._api.stop_http2_processing()
@@ -184,14 +137,11 @@ class AlexaService:
                 self._session = None
             self._api = None
             self._devices = {}
+            await self._set_state("disconnected")
 
     # --- session maintenance ---------------------------------------------
-    async def refresh_session(self, refresh_cookies: bool = True) -> bool:
-        """Refresh the access token (always) and website cookies (optional).
-
-        Returns True if the access token was renewed. Cookie renewal clears the
-        cookie jar, so callers can skip it (see COOKIE_REFRESH_INTERVAL_S).
-        """
+    async def refresh_session(self) -> bool:
+        """Refresh access token and website cookies from the stored refresh token."""
         if self._api is None:
             return False
 
@@ -201,22 +151,15 @@ class AlexaService:
             self._log("session refresh: access token refresh failed")
             return False
 
-        if refresh_cookies:
-            if await self._refresh_website_cookies():
-                self._last_cookie_refresh_ts = time.monotonic()
-            else:
-                self._log("session refresh: website cookie refresh failed (continuing)")
+        cookies_ok = await self._refresh_website_cookies()
+        if not cookies_ok:
+            self._log("session refresh: website cookie refresh failed (continuing)")
 
         await self._persist_login_data()
         return True
 
     async def _refresh_website_cookies(self) -> bool:
-        """Renew website/session cookies — these often expire after ~24 hours.
-
-        Mirrors aioamazondevices' private AmazonLogin._refresh_auth_cookies (no
-        public equivalent), but guards on the refresh result before clearing the
-        jar. Pinned to aioamazondevices==14.1.3 — re-check on library bumps.
-        """
+        """Renew website/session cookies — these often expire after ~24 hours."""
         wrapper = self._api._http_wrapper
         ss = self._api._session_state_data
         ok, json_token_resp = await wrapper.refresh_data(REFRESH_AUTH_COOKIES)
@@ -243,34 +186,11 @@ class AlexaService:
             await self.on_login_data(self._api._session_state_data.login_stored_data)
 
     async def try_recover_session(self) -> bool:
-        """Attempt soft recovery: refresh tokens, restart HTTP/2 push.
-
-        Bounded: after RECOVERY_MAX_ATTEMPTS attempts within RECOVERY_RESET_WINDOW_S
-        it gives up and returns False so the caller can fall through to a real
-        re-auth. Without this bound a permanently-rejected token loops forever
-        (the library refreshes the token on every reconnect and still gets 403),
-        bypassing its own exponential backoff.
-        """
+        """Attempt soft recovery: refresh tokens, restart HTTP/2 push."""
         if self._api is None:
             return False
 
-        async with self._connect_lock:
-            if self._api is None:
-                return False
-
-            now = time.monotonic()
-            if now - self._last_recovery_ts > RECOVERY_RESET_WINDOW_S:
-                # Spaced-out incident → the connection recovered in between.
-                self._recovery_attempts = 0
-            self._last_recovery_ts = now
-            if self._recovery_attempts >= RECOVERY_MAX_ATTEMPTS:
-                self._log(
-                    f"session recovery: giving up after {self._recovery_attempts} "
-                    "attempts without a stable connection"
-                )
-                return False
-            self._recovery_attempts += 1
-
+        async with self._recovery_lock:
             await self._set_state("reconnecting")
             try:
                 self._log("session recovery: refreshing tokens …")
@@ -295,15 +215,11 @@ class AlexaService:
         """Restart the push channel if the background task has stopped."""
         if self._api is None or self.push_is_alive:
             return
-        async with self._connect_lock:
-            # Re-check under the lock: recovery may have restarted it meanwhile.
-            if self._api is None or self.push_is_alive:
-                return
-            self._log("push channel dead — restarting …")
-            await self._api.stop_http2_processing()
-            await self._start_push_channel()
-            if self.state != "connected":
-                await self._set_state("connected")
+        self._log("push channel dead — restarting …")
+        await self._api.stop_http2_processing()
+        await self._start_push_channel()
+        if self.state != "connected":
+            await self._set_state("connected")
 
     # --- persistence (library pushes refreshed login_data here) ----------
     async def _save_to_file(self, raw_data, url: str = "login_data", content_type: str = "application/json") -> None:
@@ -319,15 +235,7 @@ class AlexaService:
         """Heartbeat: refresh session, sync state, keep push channel alive."""
         if self._api is None:
             return
-        # Refresh the access token every heartbeat (cheap), but only renew the
-        # website cookies a few times a day — renewing clears the cookie jar.
-        refresh_cookies = (
-            time.monotonic() - self._last_cookie_refresh_ts >= COOKIE_REFRESH_INTERVAL_S
-        )
-        async with self._connect_lock:
-            if self._api is None:
-                return
-            await self.refresh_session(refresh_cookies=refresh_cookies)
+        await self.refresh_session()
         await self._api.login.login_mode_stored_data()
         await self._api.sync_media_state()
         await self.ensure_push_channel()
@@ -347,12 +255,15 @@ class AlexaService:
             await self.on_media(serial, media)
 
     async def _handle_reauth(self) -> None:
-        # The library calls this from *inside* the push task, right before that
-        # task exits on an auth failure — so we can't restart the channel here
-        # (we'd be cancelling our own task). Mark reconnecting and let the
-        # push-exit watchdog drive the (bounded) recovery once the task is gone.
-        self._log("HTTP/2 auth failure — deferring recovery to push-exit watchdog")
-        await self._set_state("reconnecting")
+        self._log("HTTP/2 requested re-auth — trying soft recovery first …")
+        if await self.try_recover_session():
+            return
+
+        await self._set_state(
+            "disconnected", "Authentication expired — please re-authenticate in app settings"
+        )
+        if self.on_reauth is not None:
+            await self.on_reauth()
 
     def _watch_push_task(self) -> None:
         if self._push_task is None:
@@ -367,23 +278,13 @@ class AlexaService:
                 self._log("HTTP/2 push task ended unexpectedly — scheduling recovery")
             else:
                 return
-            # Keep a reference so the task isn't GC'd mid-flight (asyncio only
-            # holds a weak reference to bare create_task() results).
-            recover = asyncio.create_task(self._recover_after_push_exit())
-            self._recover_tasks.add(recover)
-            recover.add_done_callback(self._recover_tasks.discard)
+            asyncio.create_task(self._recover_after_push_exit())
 
         self._push_task.add_done_callback(_on_done)
 
     async def _recover_after_push_exit(self) -> None:
         if await self.try_recover_session():
             return
-        if self._api is None:
-            # Session already torn down elsewhere (e.g. user disconnect) — there's
-            # nothing to recover and no reason to clear stored credentials.
-            return
-        # Recovery exhausted/failed → terminal. on_reauth tears the session down
-        # (App._on_reauth → alexa.stop) so a dead session isn't revived by sync.
         await self._set_state(
             "disconnected", "Connection lost — please re-authenticate in app settings"
         )
