@@ -60,6 +60,6 @@
     "en": "Major update: rebuilt the app with python and use a new authentication library to hopefully resolve connection issues. Requires Homey firmware v13 or newer. One-time action: open the app settings and sign in again with your email, password and authenticator (2-step) code — your region is now detected automatically. New: 'Say with Voice' flow action with Amazon Polly voices, plus improved whisper. If you used the 'Run Routine' flow card, please re-select your routine."
   },
   "2.0.1": {
-    "en": "Fix device pairing when the stored session is stale and improve session recovery."
+    "en": "Major update: the app has been rebuilt in Python with a new authentication library to fix the recurring connection drops. Requires Homey firmware v13 or newer. One-time action: open the app settings and sign in again with your email, password and authenticator (2-step) code — your region is now detected automatically. New: 'Say with Voice' flow action with Amazon Polly voices, plus improved whisper. If you used the 'Run Routine' flow card, please re-select your routine. Also fixes adding devices, playback controls and now-playing updates."
   }
 }
