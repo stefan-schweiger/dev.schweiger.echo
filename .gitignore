@@ -8,3 +8,7 @@ __pycache__/
 **/.DS_Store
 # throwaway durability spike — contains real Amazon tokens in login_data.json, never commit
 /spike/
+
+# KI-/Agent-Dateien (nicht ins Repo — Syncthing zwischen Arctic/Book)
+/PROJEKT-REGELN.md
+/setup/grok/

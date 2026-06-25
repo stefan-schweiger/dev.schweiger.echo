@@ -34,6 +34,8 @@ class App(app.App):
         self._sync_interval = self.homey.set_interval(
             lambda: asyncio.create_task(self._sync()), SYNC_INTERVAL_MS
         )
+        self._pairing_reconnect_lock = asyncio.Lock()
+        self._pairing_reconnect_done = False
 
     async def _auto_connect(self, email: str, login_data: dict) -> None:
         self.log("Auto-connecting from stored session …")
@@ -86,6 +88,45 @@ class App(app.App):
             "error": self.alexa.last_error,
         }
 
+    def reset_pairing_reconnect(self) -> None:
+        self._pairing_reconnect_done = False
+
+    async def ensure_amazon_connected(self) -> bool:
+        """Used by pairing: reuse live session or reconnect once from stored login_data."""
+        alexa = self.alexa
+        if alexa._api is not None and alexa.state in ("connected", "reconnecting"):
+            return True
+        if alexa.state == "connecting":
+            for _ in range(30):
+                await asyncio.sleep(0.5)
+                if alexa.state in ("connected", "reconnecting"):
+                    return True
+                if alexa.state == "error":
+                    return False
+            return False
+
+        login_data = self.homey.settings.get("login_data")
+        email = self.homey.settings.get("email")
+        if not (login_data and email):
+            return False
+
+        async with self._pairing_reconnect_lock:
+            if alexa._api is not None and alexa.state in ("connected", "reconnecting"):
+                return True
+            if self._pairing_reconnect_done:
+                return alexa._api is not None and alexa.state == "connected"
+
+            self._pairing_reconnect_done = True
+            try:
+                self.log("Pairing: reconnecting from stored session …")
+                if alexa._api is not None:
+                    await alexa.stop()
+                await alexa.start_from_stored(email, login_data)
+                return alexa.state == "connected"
+            except Exception as e:  # noqa: BLE001
+                self.error(f"Pairing reconnect failed: {type(e).__name__}: {e}")
+                return False
+
     # --- internals -------------------------------------------------------
     async def _persist_login_data(self, login_data: dict) -> None:
         await self.homey.settings.set("login_data", login_data)
@@ -124,7 +165,7 @@ class App(app.App):
         await self._fanout(serial, lambda d: d.apply_media(media))
 
     async def _on_state_change(self, state: str, reason: Optional[str]) -> None:
-        if state == "connecting":
+        if state in ("connecting", "reconnecting"):
             return
         connected = state == "connected"
         for driver_id in ("echo", "group"):
@@ -144,6 +185,12 @@ class App(app.App):
 
     async def _report_error(self, e: Exception) -> None:
         info = categorize_error(e)
+        if info["needs_reauth"]:
+            self.log(f"[{info['category']}] {info['message']} — attempting recovery …")
+            if await self.alexa.try_recover_session():
+                self.log("Session recovered after error")
+                return
+
         self.error(f"[{info['category']}] {info['message']}")
         if info["category"] != "transient":
             await self.homey.flow.get_trigger_card("error").trigger({"error": info["message"]})
