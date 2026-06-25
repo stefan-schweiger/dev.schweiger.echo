@@ -119,8 +119,9 @@ class App(app.App):
             self._pairing_reconnect_done = True
             try:
                 self.log("Pairing: reconnecting from stored session …")
-                if alexa._api is not None:
-                    await alexa.stop()
+                # start_from_stored tears down any stale session and rebuilds
+                # atomically under the connection lock — no separate stop() that
+                # could race with auto-connect.
                 await alexa.start_from_stored(email, login_data)
                 return alexa.state == "connected"
             except Exception as e:  # noqa: BLE001
@@ -180,8 +181,11 @@ class App(app.App):
                     await device.set_unavailable(reason or "No connection")
 
     async def _on_reauth(self) -> None:
-        # Drop the stale session so the settings page prompts for a fresh login.
+        # Drop the stale session so the settings page prompts for a fresh login,
+        # and fully tear down the service so the periodic sync doesn't keep
+        # trying to revive a session Amazon has already rejected.
         await self.homey.settings.unset("login_data")
+        await self.alexa.stop()
 
     async def _report_error(self, e: Exception) -> None:
         info = categorize_error(e)
