@@ -10,6 +10,7 @@ DEVICES: dict[str, dict[str, object]] = {
     "A7WXQPH584YP": {"name": "Echo", "generation": 2},
     "A3FX4UWTP28V1P": {"name": "Echo", "generation": 3},
     "A3RMGO6LYLH7YN": {"name": "Echo", "generation": 4},
+    "A3RBAYBE7VM004": {"name": "Echo Studio", "generation": 1},
     "A38EHHIB10L47V": {"name": "Echo Dot", "generation": 1},
     "AKNO1N0KSFN8L": {"name": "Echo Dot", "generation": 1},
     "A3S5BH2HU6VAYF": {"name": "Echo Dot", "generation": 2},
