@@ -33,6 +33,7 @@ DEVICES: dict[str, dict[str, object]] = {
     "ASQZWP4GPYUT7": {"name": "Echo Pop", "generation": 1},
     "A10A33FOX2NUBK": {"name": "Echo Spot", "generation": 1},
     "A3EH2E0YZ30OD6": {"name": "Echo Spot", "generation": 2},
+    "A3RBAYBE7VM004": {"name": "Echo Studio", "generation": 1},
 }
 
 # Amazon Polly voices usable via SSML <voice name="..."> tags.
