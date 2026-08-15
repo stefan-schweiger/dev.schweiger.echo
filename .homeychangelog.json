@@ -70,5 +70,8 @@
   },
   "2.0.4": {
     "en": "Major reliability update for signing in and adding devices. Fixed sign-in failing with 'Cannot find account owner customer ID' (which affected accounts that had signed in several times), and fixed 'Add device' timing out while searching — adding devices, and loading them at sign-in, is now much faster. Sign-in is also saved as soon as your account is registered so a brief Amazon hiccup no longer makes you start over, the app retries automatically if Amazon returns an unexpected page, and error messages are clearer. New: an optional 'diagnostic logging' switch in app settings to help pin down connection problems. Also updated the underlying Amazon library, which fixes playback (play/pause/next/previous) controls."
+  },
+  "2.1.0": {
+    "en": "New: Do Not Disturb. Every Echo now has a Do Not Disturb toggle, plus flow cards to switch it on or off, check whether it's on, and start a flow when it changes — so you can silence notifications, announcements and calls at night and turn them back on in the morning. Alarms, timers and reminders still ring, and switching Do Not Disturb from the Alexa app or by voice updates Homey straight away. New: screen controls for devices that have a screen (Echo Show, Echo Spot, Echo Dot with clock). Turn the display on or off, set its brightness, and switch adaptive brightness on or off, each with matching flow cards. These controls appear automatically, and only on devices that actually support them. Changes you make in the Alexa app or by voice are picked up too. Also updated the underlying Amazon library and made reconnecting faster by skipping a redundant account lookup that was running on every refresh."
   }
 }

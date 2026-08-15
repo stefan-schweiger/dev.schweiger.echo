@@ -1,6 +1,6 @@
 {
   "id": "dev.schweiger.echo",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -64,5 +64,5 @@
     "url": "https://github.com/stefan-schweiger/dev.schweiger.echo/issues"
   },
   "homeyCommunityTopicId": 120365,
-  "pythonPackages": ["aioamazondevices==14.1.9"]
+  "pythonPackages": ["aioamazondevices==14.2.2"]
 }

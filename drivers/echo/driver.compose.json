@@ -12,9 +12,71 @@
     "speaker_artist",
     "speaker_album",
     "speaker_track",
-    "volume_set"
+    "volume_set",
+    "do_not_disturb"
   ],
   "capabilitiesOptions": {
+    "onoff.display": {
+      "title": {
+        "en": "Screen",
+        "de": "Bildschirm",
+        "fr": "Écran",
+        "nl": "Scherm",
+        "it": "Schermo",
+        "es": "Pantalla",
+        "sv": "Skärm",
+        "no": "Skjerm",
+        "da": "Skærm",
+        "pl": "Ekran",
+        "ru": "Экран",
+        "ko": "화면"
+      },
+      "uiQuickAction": false,
+      "insightsTitleTrue": {
+        "en": "Screen turned on",
+        "de": "Bildschirm eingeschaltet",
+        "fr": "Écran allumé",
+        "nl": "Scherm ingeschakeld",
+        "it": "Schermo acceso",
+        "es": "Pantalla encendida",
+        "sv": "Skärmen slogs på",
+        "no": "Skjermen ble slått på",
+        "da": "Skærmen blev tændt",
+        "pl": "Ekran włączony",
+        "ru": "Экран включён",
+        "ko": "화면 켜짐"
+      },
+      "insightsTitleFalse": {
+        "en": "Screen turned off",
+        "de": "Bildschirm ausgeschaltet",
+        "fr": "Écran éteint",
+        "nl": "Scherm uitgeschakeld",
+        "it": "Schermo spento",
+        "es": "Pantalla apagada",
+        "sv": "Skärmen stängdes av",
+        "no": "Skjermen ble slått av",
+        "da": "Skærmen blev slukket",
+        "pl": "Ekran wyłączony",
+        "ru": "Экран выключен",
+        "ko": "화면 꺼짐"
+      }
+    },
+    "dim": {
+      "title": {
+        "en": "Brightness",
+        "de": "Helligkeit",
+        "fr": "Luminosité",
+        "nl": "Helderheid",
+        "it": "Luminosità",
+        "es": "Brillo",
+        "sv": "Ljusstyrka",
+        "no": "Lysstyrke",
+        "da": "Lysstyrke",
+        "pl": "Jasność",
+        "ru": "Яркость",
+        "ko": "밝기"
+      }
+    },
     "volume_set": {
       "title": {
         "en": "Volume",

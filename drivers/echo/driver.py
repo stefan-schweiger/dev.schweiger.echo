@@ -6,6 +6,7 @@ from homey import driver
 
 if TYPE_CHECKING:
     from ...app import App
+    from .device import EchoDevice
 
 
 def _serial(card_arguments: Mapping[str, Any]) -> str:
@@ -56,6 +57,48 @@ class EchoDriver(driver.Driver):
         async def on_routine(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.run_routine(args["routine"]["data"]["name"])
 
+        async def on_set_dnd(args: Mapping[str, Any], **kwargs) -> None:
+            await args["device"].set_dnd(args["state"] == "on")
+
+        async def on_dnd_is_on(args: Mapping[str, Any], **kwargs) -> bool:
+            return args["device"].is_dnd_on()
+
+        async def on_set_screen(args: Mapping[str, Any], **kwargs) -> None:
+            await args["device"].set_screen(args["state"] == "on")
+
+        async def on_screen_is_on(args: Mapping[str, Any], **kwargs) -> bool:
+            return args["device"].is_screen_on()
+
+        async def on_set_adaptive_brightness(args: Mapping[str, Any], **kwargs) -> None:
+            await args["device"].set_adaptive_brightness(args["state"] == "on")
+
+        async def on_adaptive_brightness_is_on(args: Mapping[str, Any], **kwargs) -> bool:
+            return args["device"].is_adaptive_brightness_on()
+
+        # Neither custom capabilities nor sub-capabilities get automatic Flow
+        # cards, so DND and the screen bring their own. (`dim` is a system
+        # capability — Homey generates its cards, nothing to do here.) The cards
+        # carry a $filter so they only offer screen-capable devices.
+        self._dnd_triggers = {
+            True: flow.get_device_trigger_card("do-not-disturb-turned-on"),
+            False: flow.get_device_trigger_card("do-not-disturb-turned-off"),
+        }
+        flow.get_condition_card("do-not-disturb-is-on").register_run_listener(on_dnd_is_on)
+        flow.get_action_card("set-do-not-disturb").register_run_listener(on_set_dnd)
+
+        self._screen_triggers = {
+            True: flow.get_device_trigger_card("screen-turned-on"),
+            False: flow.get_device_trigger_card("screen-turned-off"),
+        }
+        flow.get_condition_card("screen-is-on").register_run_listener(on_screen_is_on)
+        flow.get_action_card("set-screen").register_run_listener(on_set_screen)
+        flow.get_condition_card("adaptive-brightness-is-on").register_run_listener(
+            on_adaptive_brightness_is_on
+        )
+        flow.get_action_card("set-adaptive-brightness").register_run_listener(
+            on_set_adaptive_brightness
+        )
+
         flow.get_action_card("message").register_run_listener(on_message)
         voice = flow.get_action_card("message_with_voice")
         voice.register_argument_autocomplete_listener("voice", autocomplete_voice)
@@ -69,6 +112,16 @@ class EchoDriver(driver.Driver):
         routine.register_run_listener(on_routine)
 
         self.log("EchoDriver has been initialized")
+
+    async def trigger_dnd(self, device: "EchoDevice", enabled: bool) -> None:
+        card = getattr(self, "_dnd_triggers", {}).get(enabled)
+        if card is not None:
+            await card.trigger(device, {})
+
+    async def trigger_screen(self, device: "EchoDevice", on: bool) -> None:
+        card = getattr(self, "_screen_triggers", {}).get(on)
+        if card is not None:
+            await card.trigger(device, {})
 
     async def on_pair_list_devices(self, view_data=None) -> list[dict]:
         app = cast("App", self.homey.app)

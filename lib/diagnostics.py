@@ -12,7 +12,7 @@ short-lived secrets at DEBUG (the bearer access token inside request headers, th
 CSRF cookie value). We redact those here before anything leaves the app; the
 library already scrubs its structured JSON dumps (see utils.scrub_fields).
 
-Pinned to aioamazondevices==14.1.9 — re-check the redaction patterns on library
+Pinned to aioamazondevices==14.2.2 — re-check the redaction patterns on library
 bumps against the sensitive DEBUG lines in http_wrapper.session_request / login.
 """
 

@@ -11,7 +11,7 @@ A Homey app (**Python** Apps SDK v3, runs on Homey's CPython 3.14 runtime) that 
 ## Tech stack
 
 - **Language/runtime:** Python (Homey runs CPython **3.14**); `"runtime": "python"`, `"pythonVersion": "3.14"` in the manifest.
-- **Core dependency:** `aioamazondevices==14.1.9` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `beautifulsoup4`, `h2`, `yarl`, …).
+- **Core dependency:** `aioamazondevices==14.2.2` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `beautifulsoup4`, `h2`, `yarl`, …).
 - **Platform:** Homey Apps SDK v3. **Requires Homey firmware >= 13.0.0** (Python apps).
 - **No test framework.** Validate with `homey app run` against a real Homey + Amazon account.
 - Type-checking (optional, local): `homey-stubs` + pyright.
@@ -43,7 +43,7 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 |------|---------|
 | `app.py` | App lifecycle; deferred auto-connect from stored session; routes push events to devices (group events fan out to cluster members); periodic `sync` heartbeat; web-api methods; `error` flow trigger. Exports `homey_export = App`. |
 | `api.py` | Web-API endpoints (`connect`/`status`/`disconnect`/`reset`); names match the manifest `api` map. `homey` is injected at call time — do **not** `from homey import Homey`. |
-| `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback), volume scaling, pairing list, sounds/routines/voices lookups. |
+| `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
 | `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
 | `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say with Voice"). |
 | `drivers/echo/driver.py` | Pairing (filters `ECHO`/`KNIGHT`/`ROOK`) + flow-action registration (incl. sound/routine/voice autocompletes). |
@@ -73,6 +73,56 @@ Amazon (HTTP/2 AVS push)
         → EchoDevice/GroupDevice.apply_volume / apply_media
 ```
 
+### Device settings (screen power / brightness) — not in the library
+
+`aioamazondevices` doesn't wrap Amazon's per-device settings endpoint, so `AlexaService`
+talks to it directly over the library's authenticated session:
+
+```
+GET  https://alexa.amazon.<domain>/api/v1/devices/<deviceAccountId>/settings/<name>
+     → {"value": "\"ON\""}                 # value is itself JSON-encoded
+PUT  https://alexa.amazon.<domain>/api/v1/devices/<deviceAccountId>/settings/<name>
+     body {"value": "\"ON\""}
+```
+
+| Setting | Values | Requires Amazon capability | Homey capability |
+|---|---|---|---|
+| `displayPower` | `"ON"` / `"OFF"` | `DISPLAY_POWER_TOGGLE` | `onoff.display` |
+| `brightness` | `0`–`100` | `DISPLAY_BRIGHTNESS_ADJUST` | `dim` (Homey 0–1) |
+| `adaptiveBrightness` | `"ON"` / `"OFF"` | `DISPLAY_ADAPTIVE_BRIGHTNESS` | `adaptive_brightness` |
+
+Others exist on the same endpoint but aren't wired up: `timeFormat` (`CLOCK_FORMAT_24_HR`),
+`attentionSpan`, `alexaGestures`, `connectedSpeakerOption`.
+
+Two gotchas:
+- **The URL is keyed on `deviceAccountId`, not the serial number**, and `AmazonDevice` has no
+  such field. It only appears in the raw `/api/devices-v2/device` response, so
+  `AlexaService._harvest_device_account_ids` skims it out of the body as it passes through
+  the library's `save_to_file` hook (which fires on *every* response) — no extra request.
+  If that map is empty, screen reads/writes raise "No deviceAccountId known".
+- **Amazon double-encodes the value**: the body is a JSON document whose `value` field is a
+  JSON-encoded scalar. Encode and decode both ways.
+
+Credit: this endpoint is mapped by `alexa-remote2` (`getDeviceSettings`/`setDeviceSettings`),
+as used by the `com.amazon.alexa` Homey app.
+
+**Screen state is polled, not pushed** — one GET per setting per screen device, after connect
+(`App._refresh_screen_state`) and on each heartbeat. Non-screen devices cost nothing.
+
+**Do Not Disturb is pushed *and* polled.** Amazon sends `PUSH_DND_STATE_CHANGE` over the
+AVS stream whenever a device's DND flips (Alexa app, voice, or routine), but
+`aioamazondevices` doesn't know that message type and drops it as *"Unknown HTTP2 push
+message"* inside `_process_rendering_update`, before any subscriber runs.
+`_allow_dnd_push_events()` widens the library's `_is_known_event_type` predicate, and
+`_intercept_dnd_push_events()` replaces the api's push handler so DND events branch off to
+`_handle_dnd_push` (payload: `dopplerId.deviceSerialNumber` + `enabled`) and everything else
+delegates untouched. Worth upstreaming — it's one enum member plus a handler.
+
+`sync_dnd()` (one `GET api/dnd/device-status-list`, whole account per request) stays as the
+safety net: it seeds state at connect and re-syncs each heartbeat, so a dropped push channel
+or a library bump that lands the patch on the floor degrades to ≤5 min lag instead of
+breaking. Both paths converge on `App._on_dnd` → `EchoDevice.apply_dnd`.
+
 ### Authentication & connection
 - **Sign-in (interactive):** `AmazonEchoApi(session, email, password)` → `api.login.login_mode_interactive(otp)` runs OAuth+PKCE + `POST /auth/register`, yielding a long-lived `refresh_token` (+ `macDms`, cookies). The whole `login_data` dict is stored in Homey settings under `login_data` (email under `email`). Authenticator-app TOTP is **required** (SMS/email codes don't work).
 - **Reconnect (stored):** `api.login.login_mode_stored_data()` — no credentials needed; access tokens/cookies are re-minted from the refresh token.
@@ -99,6 +149,19 @@ Homey uses 0–1, the Alexa API uses 0–100. Conversion lives in `lib/alexa.py`
 
 Both `echo` and `group` support: `speaker_playing`, `speaker_next`/`speaker_prev`, `speaker_track`/`speaker_artist`/`speaker_album`, `volume_set`. `speaker_shuffle`/`speaker_repeat` are present but **read-only** (`setable: false`).
 
+`echo` additionally has, **only when Amazon reports the matching capability**, the screen
+controls `onoff.display` / `dim` / `adaptive_brightness` (added and removed dynamically in
+`EchoDevice.on_init`, never listed in `driver.compose.json` — their `capabilitiesOptions`
+are, which is fine). `dim` is a system capability so Homey generates its Flow cards; the
+other two don't get any (a sub-capability and a custom capability respectively), so they
+ship hand-written cards whose device arg carries `"$filter": "capabilities=…"` to hide them
+from screenless devices.
+
+`echo` additionally has **`do_not_disturb`** — a *custom* capability (`.homeycompose/capabilities/do_not_disturb.json`, icon in `assets/`). Notes:
+- **Echo only.** Amazon's DND list covers physical devices; speaker groups never appear in it (`aioamazondevices` filters them out too), so the `group` driver doesn't get it.
+- **Custom capabilities get no automatic Flow cards.** Homey only generates those for system capabilities, so DND ships its own trigger/condition/action set in `drivers/echo/driver.flow.compose.json`, and `EchoDevice.apply_dnd` fires the triggers by hand via `EchoDriver.trigger_dnd`.
+- Added unconditionally in `EchoDevice.on_init` — Amazon exposes no per-device DND capability flag. A device Amazon never reports DND for simply keeps a `None` value.
+
 ## Device families
 
 Filtered by Amazon `device_family`: `ECHO`/`KNIGHT`/`ROOK` → echo driver; `WHA` (Whole-Home Audio) → group driver. Device `data.id` is the Amazon `serial_number` (stable — existing paired devices survive the migration without re-pairing).
@@ -106,14 +169,47 @@ Filtered by Amazon `device_family`: `ECHO`/`KNIGHT`/`ROOK` → echo driver; `WHA
 ## Common tasks
 
 - **Add a flow action:** define it in `drivers/echo/driver.flow.compose.json`, register it in `EchoDriver.on_init` (`get_action_card(id).register_run_listener(...)`, plus `register_argument_autocomplete_listener(name, ...)` for autocompletes returning `{"name": ..., "data": {"id": ...}}`), and implement the API call in `AlexaService`.
-- **Add a capability:** add to `drivers/echo/driver.compose.json`, register the listener in `device.py:on_init`, and update it from `apply_media`/`apply_volume`.
+- **Add a capability:** add to `drivers/echo/driver.compose.json`, register the listener in `device.py:on_init`, and update it from `apply_media`/`apply_volume`. For a **custom** capability also add `.homeycompose/capabilities/<id>.json` (+ an SVG under `assets/` if you set `icon`) and hand-write its Flow cards — Homey does not generate them (see `do_not_disturb`).
 - **Add an Echo model icon:** add an entry to `DEVICES` in `lib/constants.py` and an SVG to `drivers/echo/assets/`.
+
+## Pending upstream — local patches to delete when these land
+
+Local workarounds that exist only because `aioamazondevices` hasn't shipped the fix yet.
+**Check these on every library bump** and delete the local code once the upstream version is
+released; leaving them in is not harmful (each degrades to a no-op) but they're dead weight
+and they monkey-patch private internals.
+
+| Waiting on | Local code to remove | How to verify it landed |
+|---|---|---|
+| [PR #1010 — *feat: move dnd to push events*](https://github.com/chemelli74/aioamazondevices/pull/1010) (open since 2026-08-05, checks green, awaiting review) | `AlexaService._allow_dnd_push_events()` and `_intercept_dnd_push_events()` / `_handle_dnd_push()` in `lib/alexa.py` | `AmazonPushMessage.DoNotDisturbChange` exists in `structures.py` |
+
+When #1010 ships, the replacement is a proper subscription rather than a patch — the PR adds
+an `on_dnd_event` Signal emitting `dict[str, bool]`, so wire it up next to the existing
+volume/media signals in `_after_login`:
+
+```python
+self._api.on_dnd_event.append(self._handle_dnd_signal)   # payload: {serial: enabled}
+self._api.on_dnd_event.freeze()
+```
+
+Both patches then go, and `_handle_dnd_push` collapses into that subscriber. Keep
+`sync_dnd()` either way — it seeds state at connect and is the fallback if push dies. Note
+the PR also moves DND out of `get_devices_data()` into `api.sync_dnd_state()`, so re-check
+`sync_dnd()`'s use of `_dnd_handler.get_do_not_disturb_status()` at the same time — that
+method is renamed to `sync_do_not_disturb_status()` there.
+
+Related but not blocking us: [#625 store account customer id](https://github.com/chemelli74/aioamazondevices/pull/625)
+touches the same area as the customer-id workaround in `_save_to_file` and
+`_skip_known_customer_id_lookup()`. Upstream's backlog is slow (14 open PRs, oldest from
+July 2025) — don't plan around any of these landing soon.
 
 ## Known limitations
 
 - **Shuffle/repeat are read-only** — `aioamazondevices` exposes no command to set them.
 - **Sounds** come from a curated static list (`SOUNDS_LIST` in the library), not a live fetch.
 - **Routines are triggered by name** — old "Run Routine" flows from the TS app (which stored an automationId) need the routine re-selected.
+- **Screen controls only reach devices that advertise them** — `DISPLAY_POWER_TOGGLE` / `DISPLAY_BRIGHTNESS_ADJUST` / `DISPLAY_ADAPTIVE_BRIGHTNESS` in Amazon's capability list (Echo Show, Echo Spot, Dot with clock). Everything else gets no screen capabilities and the Flow cards filter themselves out. See **Device settings** below.
+- **No LED-ring control** — upstream's rule of thumb is *"as you cannot control them via Alexa Mobile App, we cannot as well"* ([aioamazondevices #924](https://github.com/chemelli74/aioamazondevices/issues/924)).
 
 ## i18n
 

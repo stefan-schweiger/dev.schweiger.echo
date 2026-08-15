@@ -27,6 +27,7 @@ class App(app.App):
         self.alexa.on_media = self._on_media
         self.alexa.on_reauth = self._on_reauth
         self.alexa.on_login_data = self._persist_login_data
+        self.alexa.on_dnd = self._on_dnd
 
         login_data = self.homey.settings.get("login_data")
         email = self.homey.settings.get("email")
@@ -49,6 +50,7 @@ class App(app.App):
         self.log("Auto-connecting from stored session …")
         try:
             await self.alexa.start_from_stored(email, login_data)
+            await self._refresh_screen_state()
             self.log("Auto-connect complete")
         except Exception as e:  # noqa: BLE001
             self.error(f"Auto-connect failed: {type(e).__name__}: {e}")
@@ -82,6 +84,7 @@ class App(app.App):
         except Exception as e:  # noqa: BLE001
             self.error(f"Login failed: {type(e).__name__}: {e}")
             return
+        await self._refresh_screen_state()
         self.log("Login successful — connected")
 
     async def disconnect(self) -> None:
@@ -152,8 +155,24 @@ class App(app.App):
     async def _sync(self) -> None:
         try:
             await self.alexa.sync()
+            await self._refresh_screen_state()
         except Exception as e:  # noqa: BLE001
             await self._report_error(e)
+
+    async def _refresh_screen_state(self) -> None:
+        """Poll display settings for screen devices — Amazon pushes none.
+
+        Runs after connect and on every heartbeat. Only devices that advertise a
+        screen do any work, and each swallows its own errors.
+        """
+        if self.alexa.state != "connected":
+            return
+        try:
+            driver = self.homey.drivers.get_driver("echo")
+        except Exception:  # noqa: BLE001 - driver not initialized yet
+            return
+        for device in driver.get_devices():
+            await device.refresh_screen_state()
 
     def _find_device(self, serial: str):
         for driver_id in ("echo", "group"):
@@ -181,6 +200,19 @@ class App(app.App):
 
     async def _on_media(self, serial: str, media) -> None:
         await self._fanout(serial, lambda d: d.apply_media(media))
+
+    async def _on_dnd(self, statuses: dict[str, bool]) -> None:
+        # Amazon reports DND per physical device only — speaker groups never
+        # appear in the list, so this walks the echo driver rather than going
+        # through _fanout (which would also hit group/cluster members).
+        try:
+            driver = self.homey.drivers.get_driver("echo")
+        except Exception:  # noqa: BLE001 - driver not initialized yet
+            return
+        for device in driver.get_devices():
+            enabled = statuses.get(device.get_data()["id"])
+            if enabled is not None:
+                await device.apply_dnd(enabled)
 
     async def _on_state_change(self, state: str, reason: Optional[str]) -> None:
         if state in ("connecting", "reconnecting"):

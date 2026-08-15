@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -86,7 +86,7 @@
   },
   "homeyCommunityTopicId": 120365,
   "pythonPackages": [
-    "aioamazondevices==14.1.9"
+    "aioamazondevices==14.2.2"
   ],
   "flow": {
     "triggers": [
@@ -140,9 +140,455 @@
           }
         ],
         "id": "error"
+      },
+      {
+        "id": "do-not-disturb-turned-on",
+        "title": {
+          "en": "Do Not Disturb turned on",
+          "de": "Nicht stören wurde eingeschaltet",
+          "fr": "Ne pas déranger activé",
+          "nl": "Niet storen ingeschakeld",
+          "it": "Non disturbare attivato",
+          "es": "No molestar activado",
+          "sv": "Stör ej aktiverades",
+          "no": "Ikke forstyrr ble aktivert",
+          "da": "Forstyr ikke blev aktiveret",
+          "pl": "Nie przeszkadzać zostało włączone",
+          "ru": "Режим «Не беспокоить» включён",
+          "ko": "방해 금지가 켜지면"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          }
+        ]
+      },
+      {
+        "id": "do-not-disturb-turned-off",
+        "title": {
+          "en": "Do Not Disturb turned off",
+          "de": "Nicht stören wurde ausgeschaltet",
+          "fr": "Ne pas déranger désactivé",
+          "nl": "Niet storen uitgeschakeld",
+          "it": "Non disturbare disattivato",
+          "es": "No molestar desactivado",
+          "sv": "Stör ej inaktiverades",
+          "no": "Ikke forstyrr ble deaktivert",
+          "da": "Forstyr ikke blev deaktiveret",
+          "pl": "Nie przeszkadzać zostało wyłączone",
+          "ru": "Режим «Не беспокоить» выключен",
+          "ko": "방해 금지가 꺼지면"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          }
+        ]
+      },
+      {
+        "id": "screen-turned-on",
+        "title": {
+          "en": "Screen turned on",
+          "de": "Bildschirm wurde eingeschaltet",
+          "fr": "Écran allumé",
+          "nl": "Scherm ingeschakeld",
+          "it": "Schermo acceso",
+          "es": "Pantalla encendida",
+          "sv": "Skärmen slogs på",
+          "no": "Skjermen ble slått på",
+          "da": "Skærmen blev tændt",
+          "pl": "Ekran został włączony",
+          "ru": "Экран включён",
+          "ko": "화면이 켜지면"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=onoff.display"
+          }
+        ]
+      },
+      {
+        "id": "screen-turned-off",
+        "title": {
+          "en": "Screen turned off",
+          "de": "Bildschirm wurde ausgeschaltet",
+          "fr": "Écran éteint",
+          "nl": "Scherm uitgeschakeld",
+          "it": "Schermo spento",
+          "es": "Pantalla apagada",
+          "sv": "Skärmen stängdes av",
+          "no": "Skjermen ble slått av",
+          "da": "Skærmen blev slukket",
+          "pl": "Ekran został wyłączony",
+          "ru": "Экран выключен",
+          "ko": "화면이 꺼지면"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=onoff.display"
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "screen-is-on",
+        "title": {
+          "en": "The screen is !{{on|off}}",
+          "de": "Der Bildschirm ist !{{eingeschaltet|ausgeschaltet}}",
+          "fr": "L'écran est !{{allumé|éteint}}",
+          "nl": "Het scherm is !{{ingeschakeld|uitgeschakeld}}",
+          "it": "Lo schermo è !{{acceso|spento}}",
+          "es": "La pantalla está !{{encendida|apagada}}",
+          "sv": "Skärmen är !{{på|av}}",
+          "no": "Skjermen er !{{på|av}}",
+          "da": "Skærmen er !{{tændt|slukket}}",
+          "pl": "Ekran jest !{{włączony|wyłączony}}",
+          "ru": "Экран !{{включён|выключен}}",
+          "ko": "화면이 !{{켜져 있으면|꺼져 있으면}}"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=onoff.display"
+          }
+        ]
+      },
+      {
+        "id": "adaptive-brightness-is-on",
+        "title": {
+          "en": "Adaptive Brightness is !{{on|off}}",
+          "de": "Automatische Helligkeit ist !{{eingeschaltet|ausgeschaltet}}",
+          "fr": "La luminosité adaptative est !{{activée|désactivée}}",
+          "nl": "Automatische helderheid is !{{ingeschakeld|uitgeschakeld}}",
+          "it": "La luminosità adattiva è !{{attivata|disattivata}}",
+          "es": "El brillo adaptativo está !{{activado|desactivado}}",
+          "sv": "Adaptiv ljusstyrka är !{{aktiverad|inaktiverad}}",
+          "no": "Adaptiv lysstyrke er !{{aktivert|deaktivert}}",
+          "da": "Adaptiv lysstyrke er !{{aktiveret|deaktiveret}}",
+          "pl": "Adaptacyjna jasność jest !{{włączona|wyłączona}}",
+          "ru": "Адаптивная яркость !{{включена|выключена}}",
+          "ko": "적응형 밝기가 !{{켜져 있으면|꺼져 있으면}}"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=adaptive_brightness"
+          }
+        ]
+      },
+      {
+        "id": "do-not-disturb-is-on",
+        "title": {
+          "en": "Do Not Disturb is !{{on|off}}",
+          "de": "Nicht stören ist !{{eingeschaltet|ausgeschaltet}}",
+          "fr": "Ne pas déranger est !{{activé|désactivé}}",
+          "nl": "Niet storen is !{{ingeschakeld|uitgeschakeld}}",
+          "it": "Non disturbare è !{{attivato|disattivato}}",
+          "es": "No molestar está !{{activado|desactivado}}",
+          "sv": "Stör ej är !{{aktiverad|inaktiverad}}",
+          "no": "Ikke forstyrr er !{{aktivert|deaktivert}}",
+          "da": "Forstyr ikke er !{{aktiveret|deaktiveret}}",
+          "pl": "Nie przeszkadzać jest !{{włączone|wyłączone}}",
+          "ru": "Режим «Не беспокоить» !{{включён|выключен}}",
+          "ko": "방해 금지가 !{{켜져 있으면|꺼져 있으면}}"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          }
+        ]
       }
     ],
     "actions": [
+      {
+        "id": "set-screen",
+        "title": {
+          "en": "Screen",
+          "de": "Bildschirm",
+          "fr": "Écran",
+          "nl": "Scherm",
+          "it": "Schermo",
+          "es": "Pantalla",
+          "sv": "Skärm",
+          "no": "Skjerm",
+          "da": "Skærm",
+          "pl": "Ekran",
+          "ru": "Экран",
+          "ko": "화면"
+        },
+        "titleFormatted": {
+          "en": "[[state]] the screen",
+          "de": "Bildschirm [[state]]",
+          "fr": "[[state]] l'écran",
+          "nl": "Scherm [[state]]",
+          "it": "[[state]] lo schermo",
+          "es": "[[state]] la pantalla",
+          "sv": "[[state]] skärmen",
+          "no": "[[state]] skjermen",
+          "da": "[[state]] skærmen",
+          "pl": "[[state]] ekran",
+          "ru": "[[state]] экран",
+          "ko": "화면 [[state]]"
+        },
+        "hint": {
+          "en": "Turn the display of an Echo Show, Echo Spot or Echo Dot with clock on or off. Only available on devices with a screen.",
+          "de": "Das Display eines Echo Show, Echo Spot oder Echo Dot mit Uhr ein- oder ausschalten. Nur auf Geräten mit Bildschirm verfügbar.",
+          "fr": "Allumer ou éteindre l'écran d'un Echo Show, Echo Spot ou Echo Dot avec horloge. Disponible uniquement sur les appareils dotés d'un écran.",
+          "nl": "Het scherm van een Echo Show, Echo Spot of Echo Dot met klok in- of uitschakelen. Alleen beschikbaar op apparaten met een scherm.",
+          "it": "Accendi o spegni il display di un Echo Show, Echo Spot o Echo Dot con orologio. Disponibile solo sui dispositivi con schermo.",
+          "es": "Enciende o apaga la pantalla de un Echo Show, Echo Spot o Echo Dot con reloj. Solo disponible en dispositivos con pantalla.",
+          "sv": "Slå på eller stäng av skärmen på en Echo Show, Echo Spot eller Echo Dot med klocka. Endast tillgängligt på enheter med skärm.",
+          "no": "Slå skjermen på en Echo Show, Echo Spot eller Echo Dot med klokke på eller av. Kun tilgjengelig på enheter med skjerm.",
+          "da": "Tænd eller sluk skærmen på en Echo Show, Echo Spot eller Echo Dot med ur. Kun tilgængelig på enheder med skærm.",
+          "pl": "Włącz lub wyłącz ekran urządzenia Echo Show, Echo Spot lub Echo Dot z zegarem. Dostępne tylko na urządzeniach z ekranem.",
+          "ru": "Включить или выключить экран Echo Show, Echo Spot или Echo Dot с часами. Доступно только на устройствах с экраном.",
+          "ko": "Echo Show, Echo Spot 또는 시계가 있는 Echo Dot의 화면을 켜거나 끕니다. 화면이 있는 기기에서만 사용할 수 있습니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=onoff.display"
+          },
+          {
+            "type": "dropdown",
+            "name": "state",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "Turn on",
+                  "de": "einschalten",
+                  "fr": "Allumer",
+                  "nl": "inschakelen",
+                  "it": "Accendi",
+                  "es": "Encender",
+                  "sv": "Slå på",
+                  "no": "Slå på",
+                  "da": "Tænd",
+                  "pl": "Włącz",
+                  "ru": "Включить",
+                  "ko": "켜기"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Turn off",
+                  "de": "ausschalten",
+                  "fr": "Éteindre",
+                  "nl": "uitschakelen",
+                  "it": "Spegni",
+                  "es": "Apagar",
+                  "sv": "Stäng av",
+                  "no": "Slå av",
+                  "da": "Sluk",
+                  "pl": "Wyłącz",
+                  "ru": "Выключить",
+                  "ko": "끄기"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set-adaptive-brightness",
+        "title": {
+          "en": "Adaptive Brightness",
+          "de": "Automatische Helligkeit",
+          "fr": "Luminosité adaptative",
+          "nl": "Automatische helderheid",
+          "it": "Luminosità adattiva",
+          "es": "Brillo adaptativo",
+          "sv": "Adaptiv ljusstyrka",
+          "no": "Adaptiv lysstyrke",
+          "da": "Adaptiv lysstyrke",
+          "pl": "Adaptacyjna jasność",
+          "ru": "Адаптивная яркость",
+          "ko": "적응형 밝기"
+        },
+        "titleFormatted": {
+          "en": "[[state]] Adaptive Brightness",
+          "de": "Automatische Helligkeit [[state]]",
+          "fr": "[[state]] la luminosité adaptative",
+          "nl": "Automatische helderheid [[state]]",
+          "it": "[[state]] la luminosità adattiva",
+          "es": "[[state]] el brillo adaptativo",
+          "sv": "[[state]] adaptiv ljusstyrka",
+          "no": "[[state]] adaptiv lysstyrke",
+          "da": "[[state]] adaptiv lysstyrke",
+          "pl": "[[state]] adaptacyjną jasność",
+          "ru": "[[state]] адаптивную яркость",
+          "ko": "적응형 밝기 [[state]]"
+        },
+        "hint": {
+          "en": "Let the device match its screen brightness to the light in the room. While this is on it overrides the brightness you set.",
+          "de": "Das Gerät passt seine Bildschirmhelligkeit an das Licht im Raum an. Solange dies aktiv ist, überschreibt es die eingestellte Helligkeit.",
+          "fr": "Laisser l'appareil adapter la luminosité de son écran à la lumière de la pièce. Tant que c'est activé, cela remplace la luminosité que vous avez définie.",
+          "nl": "Laat het apparaat de schermhelderheid aanpassen aan het licht in de kamer. Zolang dit aanstaat, overschrijft het de door jou ingestelde helderheid.",
+          "it": "Lascia che il dispositivo adatti la luminosità dello schermo alla luce nella stanza. Finché è attivo, ignora la luminosità impostata.",
+          "es": "Deja que el dispositivo ajuste el brillo de la pantalla a la luz de la habitación. Mientras esté activado, anula el brillo que hayas configurado.",
+          "sv": "Låt enheten anpassa skärmens ljusstyrka till ljuset i rummet. Så länge detta är på åsidosätter det den ljusstyrka du ställt in.",
+          "no": "La enheten tilpasse skjermens lysstyrke til lyset i rommet. Så lenge dette er på, overstyrer det lysstyrken du har angitt.",
+          "da": "Lad enheden tilpasse skærmens lysstyrke til lyset i rummet. Så længe dette er slået til, tilsidesætter det den lysstyrke, du har indstillet.",
+          "pl": "Pozwól urządzeniu dopasować jasność ekranu do światła w pomieszczeniu. Gdy jest włączone, zastępuje ustawioną przez Ciebie jasność.",
+          "ru": "Устройство подстраивает яркость экрана под освещение в комнате. Пока это включено, заданная вами яркость игнорируется.",
+          "ko": "기기가 방의 밝기에 맞춰 화면 밝기를 조정하도록 합니다. 켜져 있는 동안에는 직접 설정한 밝기가 무시됩니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=adaptive_brightness"
+          },
+          {
+            "type": "dropdown",
+            "name": "state",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "Turn on",
+                  "de": "einschalten",
+                  "fr": "Activer",
+                  "nl": "inschakelen",
+                  "it": "Attiva",
+                  "es": "Activar",
+                  "sv": "Aktivera",
+                  "no": "Aktiver",
+                  "da": "Aktivér",
+                  "pl": "Włącz",
+                  "ru": "Включить",
+                  "ko": "켜기"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Turn off",
+                  "de": "ausschalten",
+                  "fr": "Désactiver",
+                  "nl": "uitschakelen",
+                  "it": "Disattiva",
+                  "es": "Desactivar",
+                  "sv": "Inaktivera",
+                  "no": "Deaktiver",
+                  "da": "Deaktivér",
+                  "pl": "Wyłącz",
+                  "ru": "Выключить",
+                  "ko": "끄기"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set-do-not-disturb",
+        "title": {
+          "en": "Do Not Disturb",
+          "de": "Nicht stören",
+          "fr": "Ne pas déranger",
+          "nl": "Niet storen",
+          "it": "Non disturbare",
+          "es": "No molestar",
+          "sv": "Stör ej",
+          "no": "Ikke forstyrr",
+          "da": "Forstyr ikke",
+          "pl": "Nie przeszkadzać",
+          "ru": "Не беспокоить",
+          "ko": "방해 금지"
+        },
+        "titleFormatted": {
+          "en": "[[state]] Do Not Disturb",
+          "de": "Nicht stören [[state]]",
+          "fr": "[[state]] Ne pas déranger",
+          "nl": "Niet storen [[state]]",
+          "it": "[[state]] Non disturbare",
+          "es": "[[state]] No molestar",
+          "sv": "[[state]] Stör ej",
+          "no": "[[state]] Ikke forstyrr",
+          "da": "[[state]] Forstyr ikke",
+          "pl": "[[state]] Nie przeszkadzać",
+          "ru": "[[state]] режим «Не беспокоить»",
+          "ko": "방해 금지 [[state]]"
+        },
+        "hint": {
+          "en": "Silence notifications, announcements, calls and messages on this device. Alarms, timers and reminders still ring.",
+          "de": "Benachrichtigungen, Ankündigungen, Anrufe und Nachrichten auf diesem Gerät stummschalten. Wecker, Timer und Erinnerungen klingeln weiterhin.",
+          "fr": "Rendre silencieux les notifications, annonces, appels et messages sur cet appareil. Les alarmes, minuteries et rappels sonnent toujours.",
+          "nl": "Meldingen, aankondigingen, oproepen en berichten op dit apparaat dempen. Wekkers, timers en herinneringen gaan nog wel af.",
+          "it": "Silenzia notifiche, annunci, chiamate e messaggi su questo dispositivo. Sveglie, timer e promemoria suonano comunque.",
+          "es": "Silencia notificaciones, anuncios, llamadas y mensajes en este dispositivo. Las alarmas, temporizadores y recordatorios siguen sonando.",
+          "sv": "Tysta aviseringar, meddelanden, samtal och notiser på den här enheten. Alarm, timers och påminnelser hörs fortfarande.",
+          "no": "Demp varsler, kunngjøringer, anrop og meldinger på denne enheten. Alarmer, tidtakere og påminnelser ringer fortsatt.",
+          "da": "Slå notifikationer, meddelelser, opkald og beskeder fra på denne enhed. Alarmer, timere og påmindelser ringer stadig.",
+          "pl": "Wycisz powiadomienia, ogłoszenia, połączenia i wiadomości na tym urządzeniu. Alarmy, minutniki i przypomnienia nadal działają.",
+          "ru": "Отключить уведомления, объявления, звонки и сообщения на этом устройстве. Будильники, таймеры и напоминания продолжают срабатывать.",
+          "ko": "이 기기의 알림, 공지, 통화, 메시지를 무음으로 설정합니다. 알람, 타이머, 리마인더는 계속 울립니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          },
+          {
+            "type": "dropdown",
+            "name": "state",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "Turn on",
+                  "de": "einschalten",
+                  "fr": "Activer",
+                  "nl": "inschakelen",
+                  "it": "Attiva",
+                  "es": "Activar",
+                  "sv": "Aktivera",
+                  "no": "Aktiver",
+                  "da": "Aktivér",
+                  "pl": "Włącz",
+                  "ru": "Включить",
+                  "ko": "켜기"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Turn off",
+                  "de": "ausschalten",
+                  "fr": "Désactiver",
+                  "nl": "uitschakelen",
+                  "it": "Disattiva",
+                  "es": "Desactivar",
+                  "sv": "Inaktivera",
+                  "no": "Deaktiver",
+                  "da": "Deaktivér",
+                  "pl": "Wyłącz",
+                  "ru": "Выключить",
+                  "ko": "끄기"
+                }
+              }
+            ]
+          }
+        ]
+      },
       {
         "id": "message",
         "title": {
@@ -611,9 +1057,71 @@
         "speaker_artist",
         "speaker_album",
         "speaker_track",
-        "volume_set"
+        "volume_set",
+        "do_not_disturb"
       ],
       "capabilitiesOptions": {
+        "onoff.display": {
+          "title": {
+            "en": "Screen",
+            "de": "Bildschirm",
+            "fr": "Écran",
+            "nl": "Scherm",
+            "it": "Schermo",
+            "es": "Pantalla",
+            "sv": "Skärm",
+            "no": "Skjerm",
+            "da": "Skærm",
+            "pl": "Ekran",
+            "ru": "Экран",
+            "ko": "화면"
+          },
+          "uiQuickAction": false,
+          "insightsTitleTrue": {
+            "en": "Screen turned on",
+            "de": "Bildschirm eingeschaltet",
+            "fr": "Écran allumé",
+            "nl": "Scherm ingeschakeld",
+            "it": "Schermo acceso",
+            "es": "Pantalla encendida",
+            "sv": "Skärmen slogs på",
+            "no": "Skjermen ble slått på",
+            "da": "Skærmen blev tændt",
+            "pl": "Ekran włączony",
+            "ru": "Экран включён",
+            "ko": "화면 켜짐"
+          },
+          "insightsTitleFalse": {
+            "en": "Screen turned off",
+            "de": "Bildschirm ausgeschaltet",
+            "fr": "Écran éteint",
+            "nl": "Scherm uitgeschakeld",
+            "it": "Schermo spento",
+            "es": "Pantalla apagada",
+            "sv": "Skärmen stängdes av",
+            "no": "Skjermen ble slått av",
+            "da": "Skærmen blev slukket",
+            "pl": "Ekran wyłączony",
+            "ru": "Экран выключен",
+            "ko": "화면 꺼짐"
+          }
+        },
+        "dim": {
+          "title": {
+            "en": "Brightness",
+            "de": "Helligkeit",
+            "fr": "Luminosité",
+            "nl": "Helderheid",
+            "it": "Luminosità",
+            "es": "Brillo",
+            "sv": "Ljusstyrka",
+            "no": "Lysstyrke",
+            "da": "Lysstyrke",
+            "pl": "Jasność",
+            "ru": "Яркость",
+            "ko": "밝기"
+          }
+        },
         "volume_set": {
           "title": {
             "en": "Volume",
@@ -807,5 +1315,135 @@
         }
       ]
     }
-  ]
+  ],
+  "capabilities": {
+    "adaptive_brightness": {
+      "type": "boolean",
+      "title": {
+        "en": "Adaptive Brightness",
+        "de": "Automatische Helligkeit",
+        "fr": "Luminosité adaptative",
+        "nl": "Automatische helderheid",
+        "it": "Luminosità adattiva",
+        "es": "Brillo adaptativo",
+        "sv": "Adaptiv ljusstyrka",
+        "no": "Adaptiv lysstyrke",
+        "da": "Adaptiv lysstyrke",
+        "pl": "Adaptacyjna jasność",
+        "ru": "Адаптивная яркость",
+        "ko": "적응형 밝기"
+      },
+      "desc": {
+        "en": "When on, the device adjusts its screen brightness to the light in the room, overriding the brightness you set.",
+        "de": "Wenn aktiviert, passt das Gerät seine Bildschirmhelligkeit an das Licht im Raum an und überschreibt die eingestellte Helligkeit.",
+        "fr": "Lorsque activé, l'appareil adapte la luminosité de son écran à la lumière de la pièce, remplaçant la luminosité que vous avez définie.",
+        "nl": "Wanneer ingeschakeld past het apparaat de schermhelderheid aan het licht in de kamer aan en overschrijft het de door jou ingestelde helderheid.",
+        "it": "Quando è attivo, il dispositivo adatta la luminosità dello schermo alla luce nella stanza, ignorando la luminosità impostata.",
+        "es": "Cuando está activado, el dispositivo ajusta el brillo de la pantalla a la luz de la habitación, anulando el brillo que hayas configurado.",
+        "sv": "När det är på anpassar enheten skärmens ljusstyrka till ljuset i rummet och åsidosätter den ljusstyrka du ställt in.",
+        "no": "Når den er på, tilpasser enheten skjermens lysstyrke til lyset i rommet og overstyrer lysstyrken du har angitt.",
+        "da": "Når den er slået til, tilpasser enheden skærmens lysstyrke til lyset i rummet og tilsidesætter den lysstyrke, du har indstillet.",
+        "pl": "Gdy jest włączone, urządzenie dostosowuje jasność ekranu do światła w pomieszczeniu, zastępując ustawioną przez Ciebie jasność.",
+        "ru": "Когда включено, устройство подстраивает яркость экрана под освещение в комнате, игнорируя заданную вами яркость.",
+        "ko": "켜면 기기가 방의 밝기에 맞춰 화면 밝기를 조정하며, 직접 설정한 밝기를 무시합니다."
+      },
+      "getable": true,
+      "setable": true,
+      "insights": true,
+      "insightsTitleTrue": {
+        "en": "Adaptive Brightness turned on",
+        "de": "Automatische Helligkeit eingeschaltet",
+        "fr": "Luminosité adaptative activée",
+        "nl": "Automatische helderheid ingeschakeld",
+        "it": "Luminosità adattiva attivata",
+        "es": "Brillo adaptativo activado",
+        "sv": "Adaptiv ljusstyrka aktiverad",
+        "no": "Adaptiv lysstyrke aktivert",
+        "da": "Adaptiv lysstyrke aktiveret",
+        "pl": "Adaptacyjna jasność włączona",
+        "ru": "Адаптивная яркость включена",
+        "ko": "적응형 밝기 켜짐"
+      },
+      "insightsTitleFalse": {
+        "en": "Adaptive Brightness turned off",
+        "de": "Automatische Helligkeit ausgeschaltet",
+        "fr": "Luminosité adaptative désactivée",
+        "nl": "Automatische helderheid uitgeschakeld",
+        "it": "Luminosità adattiva disattivata",
+        "es": "Brillo adaptativo desactivado",
+        "sv": "Adaptiv ljusstyrka inaktiverad",
+        "no": "Adaptiv lysstyrke deaktivert",
+        "da": "Adaptiv lysstyrke deaktiveret",
+        "pl": "Adaptacyjna jasność wyłączona",
+        "ru": "Адаптивная яркость выключена",
+        "ko": "적응형 밝기 꺼짐"
+      },
+      "uiComponent": "toggle",
+      "icon": "/assets/adaptive_brightness.svg"
+    },
+    "do_not_disturb": {
+      "type": "boolean",
+      "title": {
+        "en": "Do Not Disturb",
+        "de": "Nicht stören",
+        "fr": "Ne pas déranger",
+        "nl": "Niet storen",
+        "it": "Non disturbare",
+        "es": "No molestar",
+        "sv": "Stör ej",
+        "no": "Ikke forstyrr",
+        "da": "Forstyr ikke",
+        "pl": "Nie przeszkadzać",
+        "ru": "Не беспокоить",
+        "ko": "방해 금지"
+      },
+      "desc": {
+        "en": "When on, the device stays silent: no notifications, announcements, calls or messages. Alarms, timers and reminders still ring.",
+        "de": "Wenn aktiviert, bleibt das Gerät stumm: keine Benachrichtigungen, Ankündigungen, Anrufe oder Nachrichten. Wecker, Timer und Erinnerungen klingeln weiterhin.",
+        "fr": "Lorsque activé, l'appareil reste silencieux : pas de notifications, annonces, appels ni messages. Les alarmes, minuteries et rappels sonnent toujours.",
+        "nl": "Wanneer ingeschakeld blijft het apparaat stil: geen meldingen, aankondigingen, oproepen of berichten. Wekkers, timers en herinneringen gaan nog wel af.",
+        "it": "Quando è attivo, il dispositivo resta silenzioso: nessuna notifica, annuncio, chiamata o messaggio. Sveglie, timer e promemoria suonano comunque.",
+        "es": "Cuando está activado, el dispositivo permanece en silencio: sin notificaciones, anuncios, llamadas ni mensajes. Las alarmas, temporizadores y recordatorios siguen sonando.",
+        "sv": "När det är på förblir enheten tyst: inga aviseringar, meddelanden, samtal eller notiser. Alarm, timers och påminnelser hörs fortfarande.",
+        "no": "Når den er på, forblir enheten stille: ingen varsler, kunngjøringer, anrop eller meldinger. Alarmer, tidtakere og påminnelser ringer fortsatt.",
+        "da": "Når den er slået til, forbliver enheden stille: ingen notifikationer, meddelelser, opkald eller beskeder. Alarmer, timere og påmindelser ringer stadig.",
+        "pl": "Gdy jest włączone, urządzenie pozostaje ciche: bez powiadomień, ogłoszeń, połączeń i wiadomości. Alarmy, minutniki i przypomnienia nadal działają.",
+        "ru": "Когда включено, устройство молчит: без уведомлений, объявлений, звонков и сообщений. Будильники, таймеры и напоминания продолжают срабатывать.",
+        "ko": "켜면 기기가 조용해집니다. 알림, 공지, 통화, 메시지가 오지 않습니다. 알람, 타이머, 리마인더는 계속 울립니다."
+      },
+      "getable": true,
+      "setable": true,
+      "insights": true,
+      "insightsTitleTrue": {
+        "en": "Do Not Disturb turned on",
+        "de": "Nicht stören eingeschaltet",
+        "fr": "Ne pas déranger activé",
+        "nl": "Niet storen ingeschakeld",
+        "it": "Non disturbare attivato",
+        "es": "No molestar activado",
+        "sv": "Stör ej aktiverad",
+        "no": "Ikke forstyrr aktivert",
+        "da": "Forstyr ikke aktiveret",
+        "pl": "Nie przeszkadzać włączone",
+        "ru": "«Не беспокоить» включён",
+        "ko": "방해 금지 켜짐"
+      },
+      "insightsTitleFalse": {
+        "en": "Do Not Disturb turned off",
+        "de": "Nicht stören ausgeschaltet",
+        "fr": "Ne pas déranger désactivé",
+        "nl": "Niet storen uitgeschakeld",
+        "it": "Non disturbare disattivato",
+        "es": "No molestar desactivado",
+        "sv": "Stör ej inaktiverad",
+        "no": "Ikke forstyrr deaktivert",
+        "da": "Forstyr ikke deaktiveret",
+        "pl": "Nie przeszkadzać wyłączone",
+        "ru": "«Не беспокоить» выключен",
+        "ko": "방해 금지 꺼짐"
+      },
+      "uiComponent": "toggle",
+      "icon": "/assets/do_not_disturb.svg"
+    }
+  }
 }
