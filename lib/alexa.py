@@ -25,8 +25,10 @@ from aioamazondevices.api import AmazonEchoApi
 from aioamazondevices.exceptions import CannotAuthenticate
 from aioamazondevices.const.http import (
     AMAZON_DEVICE_TYPE,
+    ARRAY_WRAPPER,
     REFRESH_ACCESS_TOKEN,
     REFRESH_AUTH_COOKIES,
+    URI_BEHAVIORS_AUTOMATIONS,
     URI_DEVICES,
     URI_REGISTER,
 )
@@ -62,6 +64,10 @@ RECOVERY_RESET_WINDOW_S = 240
 # Website/session cookies expire after ~24h; renewing them clears the whole
 # aiohttp cookie jar, so do it on a slow cadence rather than every heartbeat.
 COOKIE_REFRESH_INTERVAL_S = 6 * 60 * 60
+
+# Throttles for the routine diagnostics (see list_routines / _probe_routines).
+ROUTINES_LOG_INTERVAL_S = 60
+ROUTINES_PROBE_INTERVAL_S = 5 * 60
 
 # Amazon intermittently answers the email+password POST with a captcha /
 # interstitial / rate-limit page instead of the OTP form; the library surfaces
@@ -131,6 +137,11 @@ class AlexaService:
         self._recovery_attempts = 0
         self._last_recovery_ts = 0.0
         self._last_cookie_refresh_ts = 0.0
+        # Homey re-runs a Flow autocomplete on every keystroke, so the routine
+        # diagnostics de-duplicate themselves: log a repeated result at most
+        # once a minute, and re-probe an empty list at most every 5 minutes.
+        self._last_routines_log: tuple[str, float] = ("", 0.0)
+        self._last_probe_ts = 0.0
         self._recover_tasks: set[asyncio.Task] = set()
         self.state = "disconnected"
         self.last_error: Optional[str] = None
@@ -299,6 +310,7 @@ class AlexaService:
 
     async def _after_login(self) -> None:
         await self.refresh_devices()
+        self._log_account_context()
         self._api.on_volume_state_event.append(self._handle_volume)
         self._api.on_volume_state_event.freeze()
         self._api.on_media_state_event.append(self._handle_media)
@@ -702,9 +714,18 @@ class AlexaService:
         await self._api.call_alexa_sound(self._device(serial), sound_id)
 
     async def run_routine(self, routine_name: str) -> None:
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
         # call_routine looks routines up by name in a cache only populated by the
-        # autocomplete; refresh it so the flow works even after an app restart.
-        await self._api.update_routines()
+        # autocomplete; refresh it (list_routines does) so the flow works even
+        # after an app restart.
+        names = await self.list_routines()
+        if routine_name not in names:
+            # call_routine would raise a bare KeyError on the name — say why.
+            self._log(
+                f"run routine: '{routine_name}' is not among the {len(names)} routine(s) "
+                "Amazon returned for this account"
+            )
         await self._api.call_routine(routine_name)
 
     async def set_volume(self, serial: str, value: float) -> None:
@@ -763,6 +784,95 @@ class AlexaService:
             json_data=True,
         )
 
+    # --- diagnostics -----------------------------------------------------
+    def _log_account_context(self) -> None:
+        """One line saying which Amazon "world" this session actually talks to.
+
+        A session can be fully authenticated and still be pointed at the wrong
+        regional host: the library starts every login on amazon.com and only
+        re-pins the domain during *interactive* login (`/api/welcome` →
+        `alexaHostName`), while the AVS push region comes from the account
+        itself. When those two disagree, region-scoped data — routines above all
+        — comes back empty while devices/volume/media keep working. The device
+        ownership counts cover the other half of the same question: in an Amazon
+        Household devices are shared but routines are per-account, so an account
+        that sees devices it doesn't own may legitimately have no routines of its
+        own. Both facts are invisible in a diagnostic report otherwise (the
+        library redacts owner ids), and neither costs a request.
+        """
+        if self._api is None:
+            return
+        try:
+            ss = self._api._session_state_data
+            region = (ss.login_stored_data.get("customer_info") or {}).get("home_region", "?")
+            self._log(
+                f"account: host {ss.alexa_website_url.host}, country {ss.country_code.upper()}, "
+                f"locale {ss.language}, AVS home region {region}"
+            )
+            devices = list(self._devices.values())
+            own_id = ss.account_customer_id
+            owned = sum(1 for d in devices if d.device_owner_customer_id == own_id)
+            household = sum(1 for d in devices if d.household_device)
+            self._log(
+                f"devices: {len(devices)} total — {owned} owned by the signed-in account, "
+                f"{len(devices) - owned} owned by another account, {household} shared via household"
+            )
+        except Exception as e:  # noqa: BLE001 - diagnostics must never break login
+            self._log(f"account context unavailable: {type(e).__name__}: {e}")
+
+    async def _probe_routines(self) -> None:
+        """Log-only diagnostic for an empty routine list.
+
+        TEMPORARY (added 2026-08-20 while chasing "the routine list is empty").
+        The library asks for automations with no query parameters and keeps only
+        `status == "ENABLED"`, so an empty Flow autocomplete has three very
+        different causes that look identical from here: Amazon returned nothing,
+        Amazon returned rows we filtered out, or Amazon wants an explicit `limit`
+        (alexa-remote sends 2000, alexapy 1000). Ask once more ourselves — plain
+        and with `limit=2000` — and log the *shape* of the answer, no names. This
+        changes nothing about what the card offers; delete it once a report tells
+        us which cause it is.
+        """
+        if self._api is None:
+            return
+        base = URL.joinpath(
+            self._api._session_state_data.alexa_website_url, URI_BEHAVIORS_AUTOMATIONS
+        )
+        for label, url in (("no limit", base), ("limit=2000", base.with_query({"limit": 2000}))):
+            try:
+                status, entries = await self._fetch_automations(url)
+            except Exception as e:  # noqa: BLE001 - a probe must never raise
+                self._log(f"routines probe [{label}]: failed: {type(e).__name__}: {e}")
+                continue
+            statuses: dict[str, int] = {}
+            named = 0
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                key = str(entry.get("status"))
+                statuses[key] = statuses.get(key, 0) + 1
+                if isinstance(entry.get("name"), str) and entry["name"]:
+                    named += 1
+            histogram = ", ".join(f"{k}={v}" for k, v in sorted(statuses.items())) or "—"
+            self._log(
+                f"routines probe [{label}]: HTTP {status}, {len(entries)} entries, "
+                f"status {histogram}, {named} with a name"
+            )
+
+    async def _fetch_automations(self, url: URL) -> tuple[int, list]:
+        _, raw_resp = await self._api._http_wrapper.session_request(
+            method=HTTPMethod.GET, url=url
+        )
+        status = raw_resp.status
+        # content_type=None: this endpoint answers application/octet-stream, and
+        # an unexpected header must not masquerade as "no routines". Empty
+        # description keeps the library from dumping the payload a second time.
+        payload = await self._api._http_wrapper.response_to_json(
+            raw_resp, "", content_type=None
+        )
+        entries = payload.get(ARRAY_WRAPPER, [])
+        return status, entries if isinstance(entries, list) else []
+
     # --- lookups for flow autocomplete -----------------------------------
     def list_sounds(self) -> list[dict]:
         return sorted(
@@ -771,8 +881,37 @@ class AlexaService:
         )
 
     async def list_routines(self) -> list[str]:
+        """Enabled routine names, re-fetched on every call (Flow autocomplete).
+
+        Always reports what it got: "the routine list is empty" is the most
+        common support report on this card, and the count plus the host it came
+        from is what separates "Amazon returned nothing" from "we dropped it on
+        the floor". Names that aren't usable strings are skipped rather than
+        allowed to blow up the comprehension — Amazon does return unnamed
+        automations, and one of them would otherwise empty the whole list.
+        """
+        if self._api is None:
+            self._log_routine_result(f"routines: no Amazon session (state={self.state})")
+            return []
         await self._api.update_routines()
-        return sorted(self._api.routines)
+        raw = list(self._api.routines)
+        names = sorted((n for n in raw if isinstance(n, str) and n), key=str.lower)
+        skipped = len(raw) - len(names)
+        detail = f" ({skipped} without a usable name skipped)" if skipped else ""
+        host = self._api._session_state_data.alexa_website_url.host
+        self._log_routine_result(f"routines: {len(names)} from {host}{detail}")
+        if not names and time.monotonic() - self._last_probe_ts >= ROUTINES_PROBE_INTERVAL_S:
+            self._last_probe_ts = time.monotonic()
+            await self._probe_routines()
+        return names
+
+    def _log_routine_result(self, summary: str) -> None:
+        """Log the routine outcome, collapsing the per-keystroke repeats."""
+        now = time.monotonic()
+        previous, logged_at = self._last_routines_log
+        if summary != previous or now - logged_at >= ROUTINES_LOG_INTERVAL_S:
+            self._log(summary)
+            self._last_routines_log = (summary, now)
 
     # --- pairing ---------------------------------------------------------
     async def pairing_devices(self, kind: str) -> list[dict]:

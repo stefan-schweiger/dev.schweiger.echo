@@ -73,5 +73,8 @@
   },
   "2.1.0": {
     "en": "New: Do Not Disturb. Every Echo now has a Do Not Disturb toggle, plus flow cards to switch it on or off, check whether it's on, and start a flow when it changes — so you can silence notifications, announcements and calls at night and turn them back on in the morning. Alarms, timers and reminders still ring, and switching Do Not Disturb from the Alexa app or by voice updates Homey straight away. New: screen controls for devices that have a screen (Echo Show, Echo Spot, Echo Dot with clock). Turn the display on or off, set its brightness, and switch adaptive brightness on or off, each with matching flow cards. These controls appear automatically, and only on devices that actually support them. Changes you make in the Alexa app or by voice are picked up too. Also updated the underlying Amazon library and made reconnecting faster by skipping a redundant account lookup that was running on every refresh."
+  },
+  "2.1.1": {
+    "en": "Improvements for the 'Run Routine' flow card: routines that Amazon returns without a name no longer hide your whole routine list, and the card now reports a clear error instead of quietly doing nothing when the routine it was set to can no longer be found. Diagnostic reports also carry more detail now — which Amazon region and account your Homey is talking to, and what Amazon answers when the app asks for your routines. If your routine list comes up empty, please send a diagnostic report from the app settings (no need to switch on diagnostic logging first) so the cause can be pinned down."
   }
 }

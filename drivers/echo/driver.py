@@ -48,11 +48,14 @@ class EchoDriver(driver.Driver):
 
         async def autocomplete_routine(query: str, **kwargs) -> list[dict]:
             q = (query or "").lower()
-            return [
-                {"name": name, "data": {"name": name}}
-                for name in await self._alexa.list_routines()
-                if q in name.lower()
-            ]
+            try:
+                names = await self._alexa.list_routines()
+            except Exception as e:  # noqa: BLE001 - Homey can only show a list
+                # Without this the failure is indistinguishable from "you have
+                # no routines": Homey renders an empty picker either way.
+                self.error(f"Routine autocomplete failed: {type(e).__name__}: {e}")
+                return []
+            return [{"name": name, "data": {"name": name}} for name in names if q in name.lower()]
 
         async def on_routine(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.run_routine(args["routine"]["data"]["name"])

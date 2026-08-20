@@ -45,6 +45,7 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 | `api.py` | Web-API endpoints (`connect`/`status`/`disconnect`/`reset`); names match the manifest `api` map. `homey` is injected at call time — do **not** `from homey import Homey`. |
 | `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
 | `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
+| `lib/diagnostics.py` | Opt-in bridge from the library's Python logger into Homey's app log (redacts bearer/CSRF values). Toggled from app settings; see **Diagnostics & support reports**. |
 | `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say with Voice"). |
 | `drivers/echo/driver.py` | Pairing (filters `ECHO`/`KNIGHT`/`ROOK`) + flow-action registration (incl. sound/routine/voice autocompletes). |
 | `drivers/echo/device.py` | Capabilities, capability listeners, `apply_volume`/`apply_media`, album art, availability. |
@@ -130,6 +131,33 @@ breaking. Both paths converge on `App._on_dnd` → `EchoDevice.apply_dnd`.
 - **Login runs in the background** (`asyncio.create_task`): `connect()` returns immediately because Homey's settings web-api call times out at **10 s** while login takes **~15 s**. The settings page polls `/status` (`disconnected`/`connecting`/`connected`/`error`, plus `error` message) to drive the UI.
 - **Push:** `start_http2_processing(httpx_client, on_reauth_required=...)` opens the AVS directive stream; it reconnects itself. A true `CannotAuthenticate` triggers re-auth.
 
+### Diagnostics & support reports
+What a user's diagnostic report tells you, and why these lines exist:
+
+- **Always on** (plain `app.log`, no toggle needed):
+  - `account: host …, country …, locale …, AVS home region …` — logged once per login.
+    A session can be authenticated and still be pinned to the wrong regional host: the
+    library starts every login on `amazon.com` and re-pins the domain **only** during
+    interactive login (`/api/welcome` → `alexaHostName`, `login.py`), while the AVS region
+    comes from the account. A mismatch (e.g. host `alexa.amazon.com` + region `EU`) makes
+    region-scoped data — routines above all — come back empty while devices, volume and
+    media keep working. The locale comes from the same pin, so it also explains a US-English
+    voice on a non-US account.
+  - `devices: N total — X owned by the signed-in account, …, Y shared via household` — the
+    other half of the same question. In an Amazon Household devices are shared but routines
+    are **per-account**, so an account that only sees devices it doesn't own may legitimately
+    have zero routines. The report can't answer this otherwise: the library redacts
+    `deviceOwnerCustomerId`.
+  - `routines: N from <host>` on every autocomplete/run, plus a reason when the list is empty
+    or a name was skipped.
+- **Opt-in** (settings → debug logging): the library's own DEBUG stream, incl. the full
+  automations payload. Verbose — a routine-heavy account dumps every routine's sequence JSON.
+- **Temporary** — `AlexaService._probe_routines()` fires only when the routine list comes back
+  empty and re-asks Amazon plain and with `?limit=2000`, logging counts/status histogram (no
+  names). It exists to tell apart "Amazon returned nothing", "everything was filtered as not
+  `ENABLED`", and "the endpoint wanted an explicit limit". **Delete it once a report answers
+  that** — see the empty-routines note under Known limitations.
+
 ### Homey networking gotchas (important)
 The Homey app sandbox has **no IPv6 route** and **no system CA store**, so:
 - Force IPv4: `aiohttp.TCPConnector(family=socket.AF_INET)` and `httpx.AsyncHTTPTransport(local_address="0.0.0.0")` — otherwise connects fail with `ENETUNREACH`.
@@ -208,6 +236,15 @@ July 2025) — don't plan around any of these landing soon.
 - **Shuffle/repeat are read-only** — `aioamazondevices` exposes no command to set them.
 - **Sounds** come from a curated static list (`SOUNDS_LIST` in the library), not a live fetch.
 - **Routines are triggered by name** — old "Run Routine" flows from the TS app (which stored an automationId) need the routine re-selected.
+- **Empty routine list, under investigation (2026-08-20)** — a user report showed
+  `GET /api/behaviors/v2/automations` answering `200` with an empty body on an account whose
+  session was pinned to `alexa.amazon.com` while its AVS home region was `EU` (French devices,
+  `locale en-US`). Candidate causes: wrong regional host, routines owned by another Household
+  account, or the missing `limit` parameter that every other client sends (alexa-remote
+  defaults to 2000, alexapy 1000). The v1.x TS app had an explicit Amazon-website selector
+  (`settings/index.html` before the rewrite) — the Python library has none, it always starts at
+  `amazon.com`. Waiting on a fresh diagnostic report with the lines above before changing any
+  domain/site behaviour.
 - **Screen controls only reach devices that advertise them** — `DISPLAY_POWER_TOGGLE` / `DISPLAY_BRIGHTNESS_ADJUST` / `DISPLAY_ADAPTIVE_BRIGHTNESS` in Amazon's capability list (Echo Show, Echo Spot, Dot with clock). Everything else gets no screen capabilities and the Flow cards filter themselves out. See **Device settings** below.
 - **No LED-ring control** — upstream's rule of thumb is *"as you cannot control them via Alexa Mobile App, we cannot as well"* ([aioamazondevices #924](https://github.com/chemelli74/aioamazondevices/issues/924)).
 
