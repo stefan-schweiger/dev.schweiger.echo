@@ -26,6 +26,7 @@ from aioamazondevices.exceptions import CannotAuthenticate
 from aioamazondevices.const.http import (
     AMAZON_DEVICE_TYPE,
     ARRAY_WRAPPER,
+    DEFAULT_SITE,
     REFRESH_ACCESS_TOKEN,
     REFRESH_AUTH_COOKIES,
     URI_BEHAVIORS_AUTOMATIONS,
@@ -174,6 +175,7 @@ class AlexaService:
             try:
                 self._build(email, "", login_data)
                 await self._api.login.login_mode_stored_data()
+                await self._heal_domain_pin()
                 await self._after_login()
             except Exception:
                 # Don't leave the state stuck on "connecting" — the caller
@@ -408,6 +410,78 @@ class AlexaService:
                         "cookie": new_cookie_value
                     }
         return True
+
+    async def _heal_domain_pin(self) -> None:
+        """Re-check which Alexa host this account belongs to, and re-pin if wrong.
+
+        Every request goes to the host derived from `login_data["site"]`, which
+        the library writes exactly *once* — at the tail of interactive login,
+        after its `/api/welcome` → `alexaHostName` sniff. A stored login never
+        re-checks it and the token/cookie refreshes only mutate that same dict,
+        so a session that ends up pinned to amazon.com stays there forever. On a
+        non-US account that means `behaviors/v2/automations` answers 200 with an
+        empty body (the Flow routine list is silently empty) and the locale stays
+        en-US, while devices, volume and media keep working — so nothing looks
+        broken. Confirmed on an FR account whose only cure was a manual sign-out
+        and sign-in; this does that automatically, once per connect.
+
+        Deliberately one-way: it corrects *away* from the amazon.com default but
+        never back to it, mirroring the library's own `login_site != DEFAULT_SITE`
+        guard. A wrong or flapping answer therefore can't demote a working
+        regional session.
+
+        Best-effort throughout: any failure leaves the session on its current
+        host rather than breaking a login that was otherwise fine.
+
+        Uses the library's private `_get_alexa_domain()` and mirrors the domain
+        switch of `AmazonLogin._domain_refresh_auth_cookies()` — calling that
+        directly would re-mint cookies on *every* connect, because its switch
+        branch fires for any non-default domain. Pinned to
+        aioamazondevices==14.2.2 — re-check on library bumps.
+        """
+        if self._api is None:
+            return
+        ss = self._api._session_state_data
+        previous_site = f"https://www.amazon.{ss.domain}"
+        try:
+            host = await self._api.login._get_alexa_domain()
+            if not isinstance(host, str) or not host.startswith("alexa.amazon."):
+                self._log(f"domain check: ignoring unexpected Alexa host {host!r}")
+                return
+            if host == ss.alexa_website_url.host:
+                return
+
+            site = f"https://www.{host[len('alexa.'):]}"
+            if site == DEFAULT_SITE:
+                self._log(f"domain check: not moving {ss.alexa_website_url.host} back to {host}")
+                return
+
+            self._log(
+                f"domain: Amazon reports this account on {host}, session is pinned to "
+                f"{ss.alexa_website_url.host} — re-pinning"
+            )
+            ss.country_specific_data(site)
+            await self._api._http_wrapper.clear_csrf_cookie()
+            if not await self._refresh_website_cookies():
+                ss.country_specific_data(previous_site)
+                self._log("domain re-pin rolled back: cookie mint failed — retrying next connect")
+                return
+            self._last_cookie_refresh_ts = time.monotonic()
+            try:
+                ss.login_stored_data["site"] = site
+                await self._persist_login_data()
+            except Exception as e:  # noqa: BLE001 - harmless: we re-check next connect
+                self._log(f"domain re-pin not saved: {type(e).__name__}: {e}")
+            self._log(f"domain re-pinned to {ss.alexa_website_url.host}, locale {ss.language}")
+        except Exception as e:  # noqa: BLE001 - never break an otherwise-fine login
+            # _refresh_website_cookies only clears the cookie jar *after* a
+            # successful mint, so on any failure up to that point nothing has
+            # been torn down: restoring the domain leaves the session as it was.
+            ss.country_specific_data(previous_site)
+            self._log(
+                f"domain check failed: {type(e).__name__}: {e} — "
+                f"keeping {ss.alexa_website_url.host}"
+            )
 
     async def _persist_login_data(self) -> None:
         if self._api is not None and self.on_login_data is not None:

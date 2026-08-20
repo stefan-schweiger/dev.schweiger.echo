@@ -150,6 +150,9 @@ What a user's diagnostic report tells you, and why these lines exist:
     `deviceOwnerCustomerId`.
   - `routines: N from <host>` on every autocomplete/run, plus a reason when the list is empty
     or a name was skipped.
+  - `domain: Amazon reports this account on … — re-pinning` / `domain re-pinned to …` when the
+    self-heal corrects a wrong host (see Known limitations), or `domain check skipped: …` when
+    the sniff itself failed.
 - **Opt-in** (settings → debug logging): the library's own DEBUG stream, incl. the full
   automations payload. Verbose — a routine-heavy account dumps every routine's sequence JSON.
 - **Temporary** — `AlexaService._probe_routines()` fires only when the routine list comes back
@@ -236,15 +239,30 @@ July 2025) — don't plan around any of these landing soon.
 - **Shuffle/repeat are read-only** — `aioamazondevices` exposes no command to set them.
 - **Sounds** come from a curated static list (`SOUNDS_LIST` in the library), not a live fetch.
 - **Routines are triggered by name** — old "Run Routine" flows from the TS app (which stored an automationId) need the routine re-selected.
-- **Empty routine list, under investigation (2026-08-20)** — a user report showed
-  `GET /api/behaviors/v2/automations` answering `200` with an empty body on an account whose
-  session was pinned to `alexa.amazon.com` while its AVS home region was `EU` (French devices,
-  `locale en-US`). Candidate causes: wrong regional host, routines owned by another Household
-  account, or the missing `limit` parameter that every other client sends (alexa-remote
-  defaults to 2000, alexapy 1000). The v1.x TS app had an explicit Amazon-website selector
-  (`settings/index.html` before the rewrite) — the Python library has none, it always starts at
-  `amazon.com`. Waiting on a fresh diagnostic report with the lines above before changing any
-  domain/site behaviour.
+- **A stored session can stay pinned to the wrong Amazon domain (2026-08-20)** — the host for
+  every request comes from `login_data["site"]` (library `api.py`), which is written **once**, at
+  the tail of interactive login (`login.py`), *after* the domain sniff: `/api/welcome` →
+  `alexaHostName`. A stored login (`login_mode_stored_data`, i.e. auto-connect and the
+  heartbeat) never re-checks it, and token/cookie refreshes only mutate that dict — so a
+  session pinned to `amazon.com` stays there across every restart, forever.
+  Consequences on a non-US account: `GET /api/behaviors/v2/automations` answers `200` with an
+  empty body (routine autocomplete silently empty) while devices, volume and media keep
+  working, and `language` is derived from the same pin, so TTS speaks `en-US`.
+  Confirmed on one FR/EU account: a broken session ran on `alexa.amazon.com` + `en-US`, and a
+  logout/login on the *same app version* sniffed `alexaHostName: alexa.amazon.fr` correctly and
+  switched to `alexa.amazon.fr` + `fr-FR`. So the sniff itself works — the bug is that a bad pin
+  is never revisited. How the original pin went wrong is not known from the logs (every library
+  version we've shipped, 14.1.3 → 14.2.2, has the same sniff, so it is not a version
+  regression). Users on an older build can cure it by signing out and in again.
+  **Fixed in 2.1.1 by `AlexaService._heal_domain_pin()`** — every stored login re-runs the sniff
+  and, if the pinned host disagrees, switches the domain, re-mints the website cookies, and
+  writes the corrected `site` back into stored `login_data`. It is deliberately one-way (it
+  corrects away from `amazon.com` but never back to it, mirroring the library's own
+  `login_site != DEFAULT_SITE` guard), and it rolls the switch back if the cookie mint fails, so
+  a wrong or flapping answer from Amazon can't demote a working regional session. The one case
+  it won't follow is an account genuinely migrating *to* the US — that still needs a re-login.
+  The v1.x TS app had an explicit Amazon-website selector (`settings/index.html` before the
+  rewrite); the Python library has none — it always starts at `amazon.com`.
 - **Screen controls only reach devices that advertise them** — `DISPLAY_POWER_TOGGLE` / `DISPLAY_BRIGHTNESS_ADJUST` / `DISPLAY_ADAPTIVE_BRIGHTNESS` in Amazon's capability list (Echo Show, Echo Spot, Dot with clock). Everything else gets no screen capabilities and the Flow cards filter themselves out. See **Device settings** below.
 - **No LED-ring control** — upstream's rule of thumb is *"as you cannot control them via Alexa Mobile App, we cannot as well"* ([aioamazondevices #924](https://github.com/chemelli74/aioamazondevices/issues/924)).
 
