@@ -149,6 +149,13 @@ The host every request goes to comes from `login_data["site"]`. Two things set i
 - **Auto** (default, `amazon_site` setting empty): the library pins it once during interactive
   login from its `/api/welcome` → `alexaHostName` sniff, and `AlexaService._heal_domain_pin()`
   re-checks it on every stored login (see Known limitations for why).
+- **Pinned, during interactive sign-in**: `_interactive_login_attempt()` replaces the library's
+  `_domain_refresh_auth_cookies()` with a no-op for the duration, so the whole sign-in stays on
+  `amazon.com` (where the OAuth flow starts anyway, and which serves an EU account's device list
+  fine) and `_apply_pinned_site()` moves the session afterwards. Without that, the library's sniff
+  switches to the account's regional host mid-login and the customer-id lookup and device fetch
+  die on it — making the setting useless to exactly the people who need it, since they cannot get
+  signed in at all.
 - **Pinned**: the user picks a marketplace in app settings → `POST /amazon-site` →
   `App.set_site()` stores `amazon_site` and reconnects. `AlexaService.pinned_site` then wins:
   `_heal_domain_pin()` returns immediately and `_apply_pinned_site()` moves the session onto the

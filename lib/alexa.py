@@ -278,7 +278,30 @@ class AlexaService:
         if self._api is not None:
             await self._teardown()
         self._build(email, password, None)
-        return await self._api.login.login_mode_interactive(otp)
+        login = self._api.login
+        if not self.pinned_site:
+            return await login.login_mode_interactive(otp)
+
+        # With a server pinned, keep the whole sign-in on amazon.com: it is where
+        # the OAuth flow starts anyway (its return_to is hardcoded there) and the
+        # one host that resolves everywhere, and an EU account's device list is
+        # served there too. Left alone, the library's own /api/welcome sniff
+        # switches to the account's regional host halfway through, and the
+        # customer-id lookup and device fetch that follow then die on it — which
+        # is the very failure someone pins a server to escape, so the setting
+        # would be useless to anyone not already signed in. The pin is applied
+        # immediately afterwards by _apply_pinned_site().
+        # Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        original = login._domain_refresh_auth_cookies
+
+        async def keep_default_domain() -> None:
+            self._log(f"login: staying on {DEFAULT_SITE}, server pinned to {self.pinned_site}")
+
+        login._domain_refresh_auth_cookies = keep_default_domain
+        try:
+            return await login.login_mode_interactive(otp)
+        finally:
+            login._domain_refresh_auth_cookies = original
 
     def _build(self, email: str, password: str, login_data: Optional[dict]) -> None:
         # Fresh session — let recovery have its full budget of attempts again.
