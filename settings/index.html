@@ -13,6 +13,18 @@
       .homey-form-group {
         margin-bottom: 1rem;
       }
+      /* Chromium repaints an autofilled input with its own background and text
+         colour, which it will not let CSS override — so the email field (the
+         only one a browser autofills here) ends up looking unlike the password
+         and code fields. Deferring the background transition indefinitely keeps
+         Homey's own styling, and works in light and dark theme alike. */
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover,
+      input:-webkit-autofill:focus,
+      input:-webkit-autofill:active {
+        -webkit-text-fill-color: currentColor;
+        transition: background-color 100000s ease-in-out 0s;
+      }
     </style>
   </head>
   <body>
@@ -52,6 +64,29 @@
       <button id="disconnect" class="homey-button-danger-full" data-i18n="settings.disconnect"></button>
     </div>
 
+    <!-- Always visible: the server a session talks to matters even before sign-in. -->
+    <div id="server-container" class="homey-form-group">
+      <hr />
+      <label class="homey-form-label" for="amazon-site" data-i18n="settings.server"></label>
+      <select class="homey-form-select" id="amazon-site">
+        <option value="" data-i18n="settings.serverAuto"></option>
+        <option value="amazon.com">amazon.com</option>
+        <option value="amazon.ca">amazon.ca</option>
+        <option value="amazon.com.mx">amazon.com.mx</option>
+        <option value="amazon.com.br">amazon.com.br</option>
+        <option value="amazon.co.uk">amazon.co.uk</option>
+        <option value="amazon.de">amazon.de</option>
+        <option value="amazon.fr">amazon.fr</option>
+        <option value="amazon.it">amazon.it</option>
+        <option value="amazon.es">amazon.es</option>
+        <option value="amazon.nl">amazon.nl</option>
+        <option value="amazon.in">amazon.in</option>
+        <option value="amazon.co.jp">amazon.co.jp</option>
+        <option value="amazon.com.au">amazon.com.au</option>
+      </select>
+      <p class="homey-form-hint" data-i18n="settings.serverHint"></p>
+    </div>
+
     <!-- Always visible: lets users turn on detailed logging before reproducing a problem. -->
     <div id="diagnostics-container" class="homey-form-group">
       <hr />
@@ -74,8 +109,9 @@
         // Only alert an error if it followed a connect attempt the user made on this page
         // (avoids popping a stale error on load).
         let attempted = false;
-        // Don't let status polling overwrite the checkbox while a toggle is in flight.
+        // Don't let status polling overwrite the controls while a change is in flight.
         let debugPending = false;
+        let sitePending = false;
 
         // Turn a few known technical errors into a clearer, translated explanation.
         // The raw message is still kept in the app log / diagnostic report.
@@ -92,6 +128,11 @@
             if (err || !res) return;
             if (!debugPending) {
               document.getElementById('debug-logging').checked = !!res.debugLogging;
+            }
+            if (!sitePending) {
+              const select = document.getElementById('amazon-site');
+              select.value = res.site || '';
+              select.dataset.previous = res.site || '';
             }
             if (res.state === 'connected') {
               attempted = false;
@@ -142,6 +183,21 @@
           Homey.api('POST', '/reset', undefined, (err) => {
             if (err) return Homey.alert(err);
             showView('form');
+          });
+        });
+
+        document.getElementById('amazon-site').addEventListener('change', (e) => {
+          const site = e.target.value;
+          const previous = e.target.dataset.previous || '';
+          sitePending = true;
+          // Reconnecting on the new server takes a moment; polling shows the result.
+          Homey.api('POST', '/amazon-site', { site }, (err) => {
+            sitePending = false;
+            if (err) {
+              e.target.value = previous;
+              return Homey.alert(err);
+            }
+            e.target.dataset.previous = site;
           });
         });
 

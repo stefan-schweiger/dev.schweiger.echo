@@ -77,6 +77,21 @@ ROUTINES_PROBE_INTERVAL_S = 5 * 60
 # raise a *different* message and must not be retried.
 OTP_PAGE_MISSING = "MFA OTP code not found on login page"
 
+# Amazon hands out the account id in two forms and they are NOT interchangeable:
+#   - "amzn1.account.AGP2HK…"  obfuscated id, returned by /auth/register
+#   - "A146V8AS9QOCRT"         directed id, carried by the device list as
+#                              deviceOwnerCustomerId
+# Only the directed id works in a behaviours payload. Post a sequence with the
+# obfuscated one and Amazon answers 400 Bad Request, so login looks perfect and
+# then nothing ever speaks. See _seed_customer_id_from_register.
+OBFUSCATED_CUSTOMER_ID_PREFIX = "amzn1.account."
+
+# The library reads Amazon's post-login redirect with a raw dict lookup
+# (AmazonLogin._extract_code_from_url), so anything other than the expected
+# "here is your authorization code" redirect surfaces as a bare KeyError naming
+# the missing query parameter — which is what the user was shown.
+AUTH_CODE_PARAM = "openid.oa2.authorization_code"
+
 _PLAYBACK = {
     "play": AmazonMediaControls.Play,
     "pause": AmazonMediaControls.Pause,
@@ -119,6 +134,30 @@ def _allow_dnd_push_events() -> None:
     amazon_http2._is_known_event_type = patched
 
 
+def is_directed_customer_id(value: Optional[str]) -> bool:
+    """True for an id the behaviours API accepts (see the prefix constant)."""
+    return bool(value) and not value.startswith(OBFUSCATED_CUSTOMER_ID_PREFIX)
+
+
+def login_error_message(e: BaseException) -> str:
+    """User-facing text for a failed interactive login.
+
+    Amazon answers a rejected sign-in by simply not returning an authorization
+    code — a wrong or expired 2-step code, a captcha, or an extra verification
+    step all look like that — and the library turns it into
+    `KeyError: 'openid.oa2.authorization_code'`. Shown verbatim in app settings,
+    that reads like a crash, so users retry the same code over and over (one
+    report had five attempts in four minutes). Say what to do instead.
+    """
+    if isinstance(e, KeyError) and AUTH_CODE_PARAM in str(e):
+        return (
+            "Amazon did not complete the sign-in. Check the 2-step verification code "
+            "and try again — if it keeps failing, open the Amazon app or website once "
+            "to clear any extra verification step."
+        )
+    return f"{type(e).__name__}: {e}"
+
+
 class AlexaService:
     def __init__(self, log: Callable[[str], None]):
         self._log = log
@@ -143,6 +182,9 @@ class AlexaService:
         # once a minute, and re-probe an empty list at most every 5 minutes.
         self._last_routines_log: tuple[str, float] = ("", 0.0)
         self._last_probe_ts = 0.0
+        # Marketplace the user pinned in app settings ("amazon.fr"), or None for
+        # "Auto" — see _apply_pinned_site / _heal_domain_pin.
+        self.pinned_site: Optional[str] = None
         self._recover_tasks: set[asyncio.Task] = set()
         self.state = "disconnected"
         self.last_error: Optional[str] = None
@@ -173,8 +215,13 @@ class AlexaService:
                 await self._teardown()
             await self._set_state("connecting")
             try:
+                if self.pinned_site:
+                    # Start on the chosen host instead of connecting to the
+                    # stored one and moving afterwards.
+                    login_data = {**login_data, "site": self.site_url(self.pinned_site)}
                 self._build(email, "", login_data)
                 await self._api.login.login_mode_stored_data()
+                await self._apply_pinned_site()
                 await self._heal_domain_pin()
                 await self._after_login()
             except Exception:
@@ -217,11 +264,12 @@ class AlexaService:
                 # stored, auto-connect/sync finishes the job on the next cycle
                 # instead of forcing the user to sign in again.
                 await self._persist_login_data()
+                await self._apply_pinned_site()
                 await self._after_login()
                 self._log(f"login: complete in {time.monotonic() - t0:.1f}s")
                 return login_data
             except Exception as e:
-                await self._set_state("error", f"{type(e).__name__}: {e}")
+                await self._set_state("error", login_error_message(e))
                 raise
 
     async def _interactive_login_attempt(self, email: str, password: str, otp: str) -> dict:
@@ -304,7 +352,15 @@ class AlexaService:
         obtain_account_customer_id = login.obtain_account_customer_id
 
         async def guarded() -> None:
-            if self._api._session_state_data.account_customer_id:
+            ss = self._api._session_state_data
+            if is_directed_customer_id(ss.account_customer_id):
+                return
+            # One plain device-list fetch is all it takes — the response passes
+            # through _save_to_file, which lifts the directed id off the
+            # account's own "This Device" entry. Only if that somehow comes up
+            # empty do we fall back to the library's 30-attempt loop.
+            await self._seed_customer_id_from_device_list()
+            if is_directed_customer_id(ss.account_customer_id):
                 return
             await obtain_account_customer_id()
 
@@ -318,19 +374,36 @@ class AlexaService:
         self._api.on_media_state_event.append(self._handle_media)
         self._api.on_media_state_event.freeze()
         self._log("login: devices fetched; opening HTTP/2 push channel …")
-        if self._httpx is None or self._httpx.is_closed:
-            # local_address forces IPv4 (Homey has no IPv6 route).
-            self._httpx = httpx.AsyncClient(
-                transport=httpx.AsyncHTTPTransport(http2=True, local_address="0.0.0.0"),
-                timeout=None,
-            )
         await self._start_push_channel()
         await self._set_state("connected")
         await self.sync_dnd()
 
+    def _push_client(self) -> httpx.AsyncClient:
+        """The httpx client the AVS push channel runs on, created on demand.
+
+        Owned here rather than at login on purpose. A login that fails partway —
+        a DNS failure, a transient Amazon 503 — deliberately leaves `_api` in
+        place so the heartbeat can retry without throwing away stored
+        credentials, but it never reaches the end of _after_login. The heartbeat
+        then calls ensure_push_channel(), which used to hand the library a None
+        client; the library keeps that None and dereferences it on every
+        reconnect attempt, so the channel is dead for good ("AttributeError:
+        'NoneType' object has no attribute 'stream'", retried 5s→600s forever)
+        and live volume/media/DND updates never come back until a restart.
+
+        local_address forces IPv4 (Homey has no IPv6 route); timeout=None keeps
+        the long-lived stream open, as start_http2_processing requires.
+        """
+        if self._httpx is None or self._httpx.is_closed:
+            self._httpx = httpx.AsyncClient(
+                transport=httpx.AsyncHTTPTransport(http2=True, local_address="0.0.0.0"),
+                timeout=None,
+            )
+        return self._httpx
+
     async def _start_push_channel(self) -> None:
         self._push_task = await self._api.start_http2_processing(
-            self._httpx, on_reauth_required=self._handle_reauth
+            self._push_client(), on_reauth_required=self._handle_reauth
         )
         self._watch_push_task()
 
@@ -411,6 +484,124 @@ class AlexaService:
                     }
         return True
 
+    @staticmethod
+    def site_url(domain: str) -> str:
+        """"amazon.fr" → "https://www.amazon.fr" (the form the library stores)."""
+        return f"https://www.{domain}"
+
+    async def _account_site(self) -> Optional[str]:
+        """Retail URL of the marketplace Amazon says this account belongs to.
+
+        `/api/welcome` reports the account's own Alexa host — the same call the
+        library's interactive login makes. Returns None when the check fails or
+        the answer isn't a recognisable Alexa host, so callers keep what they
+        have instead of acting on a guess.
+        """
+        if self._api is None:
+            return None
+        try:
+            host = await self._api.login._get_alexa_domain()
+        except Exception as e:  # noqa: BLE001 - a failed check must change nothing
+            self._log(f"domain check skipped: {type(e).__name__}: {e}")
+            return None
+        if not isinstance(host, str) or not host.startswith("alexa.amazon."):
+            self._log(f"domain check: ignoring unexpected Alexa host {host!r}")
+            return None
+        site = f"https://www.{host[len('alexa.'):]}"
+        stored = self._api._session_state_data.login_stored_data
+        if stored.get("account_site") != site:
+            # Kept alongside "site" so a pinned session can still name the
+            # account's own marketplace when this check fails — that is what
+            # holds the spoken locale in place (see _apply_pinned_site).
+            stored["account_site"] = site
+            try:
+                await self._persist_login_data()
+            except Exception as e:  # noqa: BLE001 - harmless: re-learned next connect
+                self._log(f"account marketplace not saved: {type(e).__name__}: {e}")
+        return site
+
+    def _remembered_account_site(self) -> Optional[str]:
+        """The account's marketplace as last reported by Amazon, if we know it."""
+        if self._api is None:
+            return None
+        site = self._api._session_state_data.login_stored_data.get("account_site")
+        if isinstance(site, str) and site.startswith("https://www.amazon."):
+            return site
+        return None
+
+    async def _apply_pinned_site(self) -> None:
+        """Route traffic through the marketplace the user picked in app settings.
+
+        Interactive login always runs on amazon.com and the library then sniffs
+        `/api/welcome` to pick a host, so an explicit choice has to be applied
+        afterwards; a stored login starts on the right host already (see
+        start_from_stored), leaving only the locale to check here.
+
+        The pin moves the API host, the cookie domain and the retail domain — but
+        deliberately *not* the spoken locale. This setting exists so a user whose
+        network can't reach their own regional host can route around it, and the
+        locale rides along on `country_specific_data()` purely as a side effect:
+        it lands in the `locale` field of every Speak/Announce/Sound payload
+        (library `sequence.py`), so honouring the pin there would make an
+        English-configured Echo speak French just because its owner had to pin
+        amazon.fr. So the locale keeps following the *account's* marketplace.
+        """
+        if self._api is None or not self.pinned_site:
+            return
+        ss = self._api._session_state_data
+        # Falling back to the remembered marketplace matters most in exactly the
+        # case this setting exists for: if the check itself fails, the spoken
+        # locale must not silently become the pinned country's.
+        locale_site = await self._account_site() or self._remembered_account_site()
+        if ss.alexa_website_url.host == f"alexa.{self.pinned_site}":
+            self._align_locale(locale_site)
+            return
+        await self._repin_domain(
+            self.site_url(self.pinned_site),
+            "server pinned in app settings",
+            locale_site=locale_site,
+        )
+
+    def _align_locale(self, locale_site: Optional[str]) -> None:
+        """Point the spoken locale at `locale_site` without touching the host.
+
+        Only the language is corrected here — cookies and tokens are scoped to
+        the domain, the locale is not, so no re-mint is needed.
+        """
+        if self._api is None or not locale_site:
+            return
+        ss = self._api._session_state_data
+        language = self._language_of(locale_site)
+        if language is None or language == ss.language:
+            return
+        ss._language = language
+        self._log(
+            f"locale set to {language} (account marketplace), "
+            f"host {ss.alexa_website_url.host}"
+        )
+
+    def _language_of(self, site: str) -> Optional[str]:
+        """The locale the library would derive for `site`, without keeping it.
+
+        `country_specific_data()` is a plain setter over country/domain/language
+        with no I/O, so applying the other marketplace and putting the current
+        one back is the cheapest way to ask "what locale does amazon.fr mean?"
+        without duplicating the library's langcodes handling.
+        Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        """
+        if self._api is None:
+            return None
+        ss = self._api._session_state_data
+        current = f"https://www.amazon.{ss.domain}"
+        try:
+            ss.country_specific_data(site)
+            return ss.language
+        except Exception as e:  # noqa: BLE001 - unknown TLD: keep the locale we have
+            self._log(f"locale for {site} unavailable: {type(e).__name__}: {e}")
+            return None
+        finally:
+            ss.country_specific_data(current)
+
     async def _heal_domain_pin(self) -> None:
         """Re-check which Alexa host this account belongs to, and re-pin if wrong.
 
@@ -441,31 +632,51 @@ class AlexaService:
         """
         if self._api is None:
             return
+        if self.pinned_site:
+            # The user chose a server explicitly; never second-guess that.
+            return
+        ss = self._api._session_state_data
+        site = await self._account_site()
+        if site is None or site == f"https://www.amazon.{ss.domain}":
+            return
+        if site == DEFAULT_SITE:
+            self._log(f"domain check: not moving {ss.alexa_website_url.host} back to {site}")
+            return
+        await self._repin_domain(site, f"Amazon reports this account on {site}")
+
+    async def _repin_domain(
+        self, site: str, reason: str, locale_site: Optional[str] = None
+    ) -> bool:
+        """Move the session to `site` (a "https://www.amazon.xx" retail URL).
+
+        Switches the domain, re-mints the website cookies for it and saves the
+        new host into stored `login_data` so the next start begins there.
+        Mirrors the switch in `AmazonLogin._domain_refresh_auth_cookies()` rather
+        than calling it, because that one re-mints cookies on *every* connect for
+        any non-default domain. Pinned to aioamazondevices==14.2.2.
+
+        `locale_site` keeps the spoken locale on a *different* marketplace than
+        the traffic — see _apply_pinned_site. Omit it and the locale follows the
+        host, which is what the self-heal wants.
+        """
+        if self._api is None:
+            return False
         ss = self._api._session_state_data
         previous_site = f"https://www.amazon.{ss.domain}"
+        language = self._language_of(locale_site) if locale_site else None
+        self._log(f"domain: {reason}, session is on {ss.alexa_website_url.host} — re-pinning")
         try:
-            host = await self._api.login._get_alexa_domain()
-            if not isinstance(host, str) or not host.startswith("alexa.amazon."):
-                self._log(f"domain check: ignoring unexpected Alexa host {host!r}")
-                return
-            if host == ss.alexa_website_url.host:
-                return
-
-            site = f"https://www.{host[len('alexa.'):]}"
-            if site == DEFAULT_SITE:
-                self._log(f"domain check: not moving {ss.alexa_website_url.host} back to {host}")
-                return
-
-            self._log(
-                f"domain: Amazon reports this account on {host}, session is pinned to "
-                f"{ss.alexa_website_url.host} — re-pinning"
-            )
             ss.country_specific_data(site)
+            if language is not None:
+                ss._language = language
             await self._api._http_wrapper.clear_csrf_cookie()
             if not await self._refresh_website_cookies():
+                # _refresh_website_cookies only clears the cookie jar *after* a
+                # successful mint, so nothing has been torn down yet: restoring
+                # the domain leaves the session exactly as it was.
                 ss.country_specific_data(previous_site)
                 self._log("domain re-pin rolled back: cookie mint failed — retrying next connect")
-                return
+                return False
             self._last_cookie_refresh_ts = time.monotonic()
             try:
                 ss.login_stored_data["site"] = site
@@ -473,15 +684,14 @@ class AlexaService:
             except Exception as e:  # noqa: BLE001 - harmless: we re-check next connect
                 self._log(f"domain re-pin not saved: {type(e).__name__}: {e}")
             self._log(f"domain re-pinned to {ss.alexa_website_url.host}, locale {ss.language}")
+            return True
         except Exception as e:  # noqa: BLE001 - never break an otherwise-fine login
-            # _refresh_website_cookies only clears the cookie jar *after* a
-            # successful mint, so on any failure up to that point nothing has
-            # been torn down: restoring the domain leaves the session as it was.
             ss.country_specific_data(previous_site)
             self._log(
-                f"domain check failed: {type(e).__name__}: {e} — "
+                f"domain re-pin failed: {type(e).__name__}: {e} — "
                 f"keeping {ss.alexa_website_url.host}"
             )
+            return False
 
     async def _persist_login_data(self) -> None:
         if self._api is not None and self.on_login_data is not None:
@@ -567,7 +777,9 @@ class AlexaService:
         # Covers interactive login (register) and stored/reconnect login (device list).
         if not isinstance(raw_data, str) or self._api is None:
             return
-        needs_customer_id = not self._api._session_state_data.account_customer_id
+        needs_customer_id = not is_directed_customer_id(
+            self._api._session_state_data.account_customer_id
+        )
         if URI_REGISTER in url:
             if needs_customer_id:
                 self._seed_customer_id_from_register(raw_data)
@@ -597,14 +809,41 @@ class AlexaService:
             self._log(f"device settings available for {len(found)} device(s)")
         self._device_account_ids.update(found)
 
+    async def _seed_customer_id_from_device_list(self) -> None:
+        """Fetch the device list once purely to learn the directed customer id.
+
+        Cheaper and more predictable than the library's own lookup, which polls
+        the same endpoint up to 30 times waiting for the *just-registered*
+        virtual device to show up — something Amazon stops doing once an account
+        has collected a pile of app registrations.
+        """
+        if self._api is None:
+            return
+        try:
+            await self._api._http_wrapper.session_request(
+                method=HTTPMethod.GET,
+                url=URL.joinpath(
+                    self._api._session_state_data.alexa_website_url, URI_DEVICES
+                ),
+            )
+        except Exception as e:  # noqa: BLE001 - the library's lookup still follows
+            self._log(f"customer id lookup via device list failed: {type(e).__name__}: {e}")
+
     def _seed_customer_id_from_register(self, body: str) -> None:
         try:
             customer_id = json.loads(body)["response"]["success"]["customer_id"]
         except (json.JSONDecodeError, KeyError, TypeError):
             return
-        if customer_id:
-            self._api._session_state_data.account_customer_id = customer_id
-            self._log("login: seeded account customer id from registration")
+        if not customer_id:
+            return
+        if not is_directed_customer_id(customer_id):
+            # Registration returns the obfuscated form, which every sequence
+            # POST rejects with 400 — leave the id unset so the device list can
+            # supply the directed one.
+            self._log("login: registration returned an obfuscated customer id — ignoring it")
+            return
+        self._api._session_state_data.account_customer_id = customer_id
+        self._log("login: seeded account customer id from registration")
 
     def _seed_customer_id_from_devices(self, body: str) -> None:
         try:
@@ -885,8 +1124,17 @@ class AlexaService:
             )
             devices = list(self._devices.values())
             own_id = ss.account_customer_id
-            owned = sum(1 for d in devices if d.device_owner_customer_id == own_id)
             household = sum(1 for d in devices if d.household_device)
+            if not is_directed_customer_id(own_id):
+                # Comparing a directed deviceOwnerCustomerId against an
+                # obfuscated account id would report every device as somebody
+                # else's — say nothing rather than something false.
+                self._log(
+                    f"devices: {len(devices)} total, {household} shared via household "
+                    "— ownership unknown (no directed customer id yet)"
+                )
+                return
+            owned = sum(1 for d in devices if d.device_owner_customer_id == own_id)
             self._log(
                 f"devices: {len(devices)} total — {owned} owned by the signed-in account, "
                 f"{len(devices) - owned} owned by another account, {household} shared via household"

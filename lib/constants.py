@@ -3,7 +3,34 @@
 `DEVICES` maps an Amazon device type to a friendly model name and generation,
 used only to pick the right SVG pairing icon. Unknown types still pair fine,
 they just get the default icon.
+
+`AMAZON_SITES` is the allowlist behind the "Amazon server" setting.
 """
+
+# Marketplaces a user may pin in app settings, and the allowlist the web-api
+# validates against. Every entry must have a live `alexa.amazon.<domain>` host:
+# they resolve to three backends (pitangui for the Americas, layla for Europe
+# and India, alexa.amazon.co.jp for Japan/Australia), but the domain is not
+# only the host — the library derives the token/cookie domain *and* the spoken
+# locale from it (`fr` → fr-FR), so each country stays a separate choice.
+# Deliberately absent: amazon.se and amazon.pl, which have no Alexa host at all
+# (DNS returns no address) — pinning one would break the app outright. Those
+# users belong on Auto or on a neighbouring marketplace.
+AMAZON_SITES: tuple[str, ...] = (
+    "amazon.com",
+    "amazon.ca",
+    "amazon.com.mx",
+    "amazon.com.br",
+    "amazon.co.uk",
+    "amazon.de",
+    "amazon.fr",
+    "amazon.it",
+    "amazon.es",
+    "amazon.nl",
+    "amazon.in",
+    "amazon.co.jp",
+    "amazon.com.au",
+)
 
 DEVICES: dict[str, dict[str, object]] = {
     "AB72C64C86AW2": {"name": "Echo", "generation": 1},

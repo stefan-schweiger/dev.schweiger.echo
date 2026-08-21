@@ -5,7 +5,8 @@ from typing import Optional
 
 from homey import app
 
-from .lib.alexa import AlexaService
+from .lib.alexa import AlexaService, login_error_message
+from .lib.constants import AMAZON_SITES
 from .lib.connection import categorize_error
 from .lib.diagnostics import DiagnosticLogging
 
@@ -22,6 +23,8 @@ class App(app.App):
             self._diagnostics.apply(True)
 
         self.alexa = AlexaService(self.log)
+        # "" / missing = Auto (let Amazon's own /api/welcome decide).
+        self.alexa.pinned_site = self.homey.settings.get("amazon_site") or None
         self.alexa.on_state_change = self._on_state_change
         self.alexa.on_volume = self._on_volume
         self.alexa.on_media = self._on_media
@@ -82,7 +85,7 @@ class App(app.App):
         try:
             await self.alexa.start_interactive(email, password, otp)
         except Exception as e:  # noqa: BLE001
-            self.error(f"Login failed: {type(e).__name__}: {e}")
+            self.error(f"Login failed: {login_error_message(e)}")
             return
         await self._refresh_screen_state()
         self.log("Login successful — connected")
@@ -102,7 +105,35 @@ class App(app.App):
             "state": self.alexa.state,
             "error": self.alexa.last_error,
             "debugLogging": self._diagnostics.enabled,
+            "site": self.homey.settings.get("amazon_site") or "",
+            "sites": list(AMAZON_SITES),
         }
+
+    async def set_site(self, site: str) -> dict:
+        """Pin the Amazon marketplace, or "" for Auto.
+
+        Auto is right for nearly everyone — Amazon tells us the host on sign-in —
+        but it depends on that host being resolvable, and some networks cannot
+        resolve the regional one (e.g. alexa.amazon.fr behind a DNS filter). This
+        is the manual way out: pick a marketplace that does work.
+        """
+        if site and site not in AMAZON_SITES:
+            raise ValueError(f"Unknown Amazon site: {site}")
+        await self.homey.settings.set("amazon_site", site)
+        self.alexa.pinned_site = site or None
+        self.log(f"Amazon server set to {site or 'Auto'}")
+
+        # Apply straight away when we have a session to rebuild; otherwise the
+        # choice simply takes effect at the next sign-in.
+        login_data = self.homey.settings.get("login_data")
+        email = self.homey.settings.get("email")
+        if login_data and email:
+            try:
+                await self.alexa.start_from_stored(email, login_data)
+            except Exception as e:  # noqa: BLE001 - surfaced via /status
+                self.error(f"Reconnect after server change failed: {type(e).__name__}: {e}")
+                await self._report_error(e)
+        return {"site": site}
 
     async def set_debug_logging(self, enabled: bool) -> None:
         await self.homey.settings.set("debug_logging", enabled)

@@ -11,6 +11,9 @@
     "otp": "Authenticator-code (OTP)",
     "otpHint": "Vereist tweestapsverificatie via een authenticator-app. Sms- of e-mailcodes werken niet.",
     "connecting": "Verbinden met Amazon…",
+    "server": "Amazon-server",
+    "serverAuto": "Automatisch (aanbevolen)",
+    "serverHint": "Laat dit op Automatisch staan — Amazon geeft de app door bij welke server je account hoort. Kies alleen een land als de verbinding mislukt omdat je netwerk die server niet kan bereiken. Je keuze verandert alleen met welke server de app praat: gesproken berichten houden de taal van je Amazon-account.",
     "debugLogging": "Diagnostische logging inschakelen",
     "debugLoggingHint": "Schakel dit alleen in bij het oplossen van problemen. Het legt gedetailleerde technische logs vast (zonder gevoelige gegevens) zodat ze in een diagnoserapport verschijnen. Reproduceer het probleem terwijl dit aanstaat, stuur een diagnoserapport en schakel het daarna weer uit.",
     "errorOtpPage": "Amazon toonde de stap voor de authenticator-code niet. Meestal betekent dit dat je e-mailadres of wachtwoord onjuist is, of dat tweestapsverificatie niet is ingesteld met een authenticator-app (sms- of e-mailcodes werken niet) — soms is het gewoon een tijdelijke beveiligingscontrole. Controleer je Amazon-e-mailadres en wachtwoord, zorg dat er een authenticator-app is ingeschakeld onder Amazon → Inloggen en beveiliging → Tweestapsverificatie, en probeer het opnieuw met een nieuwe code."

@@ -1,6 +1,6 @@
 {
   "id": "dev.schweiger.echo",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -34,6 +34,10 @@
     "set_debug_logging": {
       "method": "POST",
       "path": "/debug-logging"
+    },
+    "set_site": {
+      "method": "POST",
+      "path": "/amazon-site"
     }
   },
   "images": {

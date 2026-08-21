@@ -50,7 +50,7 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 | `drivers/echo/driver.py` | Pairing (filters `ECHO`/`KNIGHT`/`ROOK`) + flow-action registration (incl. sound/routine/voice autocompletes). |
 | `drivers/echo/device.py` | Capabilities, capability listeners, `apply_volume`/`apply_media`, album art, availability. |
 | `drivers/group/*` | Speaker-group driver/device — same structure; pairing filters the `WHA` family. |
-| `settings/index.html` | Sign-in UI: email/password/OTP form; three views (form / connecting / connected) driven by polling `/status`. |
+| `settings/index.html` | Sign-in UI: email/password/OTP form; three views (form / connecting / connected) driven by polling `/status`. Plus two always-visible controls: the **Amazon server** picker (Auto + the marketplaces in `AMAZON_SITES`) and the diagnostic-logging switch. |
 
 ## Architecture patterns
 
@@ -129,7 +129,46 @@ breaking. Both paths converge on `App._on_dnd` → `EchoDevice.apply_dnd`.
 - **Reconnect (stored):** `api.login.login_mode_stored_data()` — no credentials needed; access tokens/cookies are re-minted from the refresh token.
 - **Auto-connect is deferred** off `on_init` via `set_timeout(..., 2000)` so drivers initialize first (otherwise `on_state_change` hits "Driver Not Initialized").
 - **Login runs in the background** (`asyncio.create_task`): `connect()` returns immediately because Homey's settings web-api call times out at **10 s** while login takes **~15 s**. The settings page polls `/status` (`disconnected`/`connecting`/`connected`/`error`, plus `error` message) to drive the UI.
-- **Push:** `start_http2_processing(httpx_client, on_reauth_required=...)` opens the AVS directive stream; it reconnects itself. A true `CannotAuthenticate` triggers re-auth.
+- **Push:** `start_http2_processing(httpx_client, on_reauth_required=...)` opens the AVS directive stream; it reconnects itself. A true `CannotAuthenticate` triggers re-auth. The httpx client comes from `AlexaService._push_client()` and **must never be None**: the library stores whatever it is handed and dereferences it on every reconnect, so a None client kills the channel permanently (`'NoneType' object has no attribute 'stream'`, retried 5s→600s). That is why the client is created on demand there instead of during login — a login that fails partway keeps `_api` alive for the heartbeat to retry, and the heartbeat's `ensure_push_channel()` is a caller too.
+
+### Account customer id — two formats, only one works
+Amazon returns the account id in two shapes and they are not interchangeable:
+`/auth/register` gives the **obfuscated** `amzn1.account.…` form, while the device list carries
+the **directed** form (`A146V8AS9QOCRT`) as `deviceOwnerCustomerId`. Every behaviours payload
+(Speak / Announce / Sound / routines) needs the *directed* one — post a sequence with the
+obfuscated id and Amazon answers **400 Bad Request**, so sign-in looks perfect and then nothing
+ever speaks. Guard with `is_directed_customer_id()` before treating an id as usable, and note
+that `AlexaService._log_account_context()`'s ownership counts are meaningless without it (an
+obfuscated id never matches any `deviceOwnerCustomerId`, so every device reads as somebody
+else's). Seeding therefore prefers the device list; `_seed_customer_id_from_device_list()` fetches
+it once explicitly rather than letting the library poll 30 times for the just-registered device.
+
+### Amazon server selection (Auto vs. pinned)
+The host every request goes to comes from `login_data["site"]`. Two things set it:
+
+- **Auto** (default, `amazon_site` setting empty): the library pins it once during interactive
+  login from its `/api/welcome` → `alexaHostName` sniff, and `AlexaService._heal_domain_pin()`
+  re-checks it on every stored login (see Known limitations for why).
+- **Pinned**: the user picks a marketplace in app settings → `POST /amazon-site` →
+  `App.set_site()` stores `amazon_site` and reconnects. `AlexaService.pinned_site` then wins:
+  `_heal_domain_pin()` returns immediately and `_apply_pinned_site()` moves the session onto the
+  chosen host. This exists for networks that cannot resolve their own regional host (e.g. a DNS
+  filter that breaks `alexa.amazon.fr`), not as a general preference.
+
+Two rules worth keeping:
+
+- **The pin moves the host, not the voice.** `country_specific_data()` derives the API host, the
+  cookie/retail domain *and* `language` from one TLD, and that language lands in the `locale`
+  field of every Speak/Announce/Sound payload (library `sequence.py`). So `_repin_domain()` takes
+  a `locale_site` and restores the *account's* locale after the switch — otherwise someone who
+  pinned `amazon.fr` for connectivity reasons would have their English Echo answer in French.
+  `_language_of()` reads a marketplace's locale by applying it and putting the old one back
+  (`country_specific_data` is a pure setter, no I/O).
+- **Pin within the region.** `.co.uk/.de/.fr/.it/.es/.nl/.in` are all the same backend
+  (`layla.amazon.com`), `.com/.ca/.com.mx/.com.br` are `pitangui`, `.co.jp/.com.au` are Japan.
+  A pin inside one group is free; across groups the account's routines don't exist on the other
+  backend (empty routine list). `amazon.se` and `amazon.pl` have **no** Alexa host at all and are
+  therefore not offered.
 
 ### Diagnostics & support reports
 What a user's diagnostic report tells you, and why these lines exist:
@@ -151,8 +190,16 @@ What a user's diagnostic report tells you, and why these lines exist:
   - `routines: N from <host>` on every autocomplete/run, plus a reason when the list is empty
     or a name was skipped.
   - `domain: Amazon reports this account on … — re-pinning` / `domain re-pinned to …` when the
-    self-heal corrects a wrong host (see Known limitations), or `domain check skipped: …` when
-    the sniff itself failed.
+    self-heal corrects a wrong host (see Known limitations), `domain: server pinned in app
+    settings …` when the user's choice is applied, `locale set to … (account marketplace)` when
+    the spoken locale is kept off the pinned host, or `domain check skipped: …` when the sniff
+    itself failed.
+- **Error messages worth recognising** (both from `categorize_error` / `login_error_message`):
+  `Cannot resolve <host> — your network returns no address for it` means DNS, not Amazon — the
+  library reports every transport failure as the same `CannotConnect`, so this walks the cause
+  chain for a `socket.gaierror` and names the host. `Amazon did not complete the sign-in` is the
+  library's raw `KeyError: 'openid.oa2.authorization_code'`, i.e. Amazon returned no
+  authorization code: wrong/expired 2-step code, a captcha, or an extra verification step.
 - **Opt-in** (settings → debug logging): the library's own DEBUG stream, incl. the full
   automations payload. Verbose — a routine-heavy account dumps every routine's sequence JSON.
 - **Temporary** — `AlexaService._probe_routines()` fires only when the routine list comes back

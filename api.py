@@ -24,3 +24,7 @@ async def reset(*, homey, query: dict, params: dict, body: dict) -> None:
 
 async def set_debug_logging(*, homey, query: dict, params: dict, body: dict[str, Any]) -> None:
     await homey.app.set_debug_logging(bool(body.get("enabled")))
+
+
+async def set_site(*, homey, query: dict, params: dict, body: dict[str, Any]) -> dict:
+    return await homey.app.set_site(str(body.get("site") or ""))

@@ -11,6 +11,9 @@
     "otp": "Godkendelseskode (OTP)",
     "otpHint": "Kræver to-trins-bekræftelse med en godkendelses-app. SMS- eller e-mailkoder virker ikke.",
     "connecting": "Forbinder til Amazon…",
+    "server": "Amazon-server",
+    "serverAuto": "Automatisk (anbefalet)",
+    "serverHint": "Lad denne stå på Automatisk – Amazon fortæller appen, hvilken server din konto hører til. Vælg kun et land, hvis forbindelsen fejler, fordi dit netværk ikke kan nå den server. Dit valg ændrer kun, hvilken server appen taler med: talte meddelelser beholder sproget fra din Amazon-konto.",
     "debugLogging": "Aktivér diagnostisk logning",
     "debugLoggingHint": "Slå kun dette til ved fejlfinding. Det registrerer detaljerede tekniske logfiler (uden følsomme data), så de vises i en diagnoserapport. Gengiv problemet, mens det er slået til, send en diagnoserapport, og slå det derefter fra igen.",
     "errorOtpPage": "Amazon viste ikke trinnet til indtastning af godkendelseskoden. Det skyldes som regel en forkert e-mail eller adgangskode, eller at to-trins-bekræftelse ikke er sat op med en godkendelses-app (SMS- eller e-mailkoder virker ikke) — nogle gange er det blot et midlertidigt sikkerhedstjek. Tjek din Amazon-e-mail og adgangskode, sørg for, at en godkendelses-app er aktiveret under Amazon → Login og sikkerhed → To-trins-bekræftelse, og prøv derefter igen med en ny kode."
