@@ -220,12 +220,13 @@ The Homey app sandbox has **no IPv6 route** and **no system CA store**, so:
 - Force IPv4: `aiohttp.TCPConnector(family=socket.AF_INET)` and `httpx.AsyncHTTPTransport(local_address="0.0.0.0")` — otherwise connects fail with `ENETUNREACH`.
 - Provide CAs via `certifi`: `ssl.create_default_context(cafile=certifi.where())` — otherwise TLS fails with `CERTIFICATE_VERIFY_FAILED`.
 - A per-request `aiohttp.ClientTimeout` keeps a stalled request from hanging forever.
+- Hold resolved addresses: `ttl_dns_cache=DNS_CACHE_TTL_S` (120s) on the connector, because aiohttp's 10s default makes one login or one routine picker visit a burst of lookups, and some home resolvers answer the first few and then return `gaierror(-5) No address associated with hostname` — which then sticks, apparently negatively cached. Reported by several French testers on `alexa.amazon.fr`/`.de`; an on-device test resolved the same name four times, then failed every attempt after that. Fewer lookups is the mitigation; a quick retry is not, since it hits the same cached miss.
 
 ### Volume scale
 Homey uses 0–1, the Alexa API uses 0–100. Conversion lives in `lib/alexa.py`.
 
 ### Error categorization
-`categorize_error()` (`lib/connection.py`) maps library exceptions: `CannotAuthenticate`/`CannotRegisterDevice` → `auth` (no retry, needs re-auth); `CannotConnect` → `network` (retry); `CannotRetrieveData` → `transient` (retry); else `unknown`. The `error` flow trigger fires for non-transient errors.
+`categorize_error()` (`lib/connection.py`) maps library exceptions: `CannotAuthenticate`/`CannotRegisterDevice` → `auth` (no retry, needs re-auth); `CannotConnect` → `network` (retry); `CannotRetrieveData` → `transient` (retry); else `unknown`. The `error` flow trigger fires for non-transient errors. `unresolved_host_message()` in the same module owns the one sentence used whenever a request died in DNS, and every surface that shows a user an error reuses it: the connection state, `login_error_message()` for a failed sign-in, and `_explained()` in `drivers/echo/driver.py`, which wraps each action card's run listener. Anything that is not a DNS failure keeps its original exception so logs stay precise.
 
 ### SSML
 `call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.

@@ -47,6 +47,24 @@ def _unresolved_host(e: BaseException) -> Optional[str]:
     return None
 
 
+def unresolved_host_message(e: BaseException) -> Optional[str]:
+    """Plain-language reason when a request died in DNS, else None.
+
+    Shared so every surface tells the same story: the state the heartbeat sets,
+    app settings after a failed sign-in, and a Flow card that just refused to
+    run. The library funnels all of them into `CannotConnect("Connection error
+    during GET")`, and two testers spent a week suspecting their Amazon password
+    while their network was simply returning no address.
+    """
+    host = _unresolved_host(e)
+    if host is None:
+        return None
+    return (
+        f"Cannot resolve {host} — your network returns no address for it. "
+        "Check your router's DNS server and any ad/tracker filtering."
+    )
+
+
 def categorize_error(e: Exception) -> dict:
     """Map a library exception to a category + how the app should react.
 
@@ -60,16 +78,13 @@ def categorize_error(e: Exception) -> dict:
             "message": "Authentication expired — please re-authenticate in app settings",
         }
     if isinstance(e, CannotConnect):
-        host = _unresolved_host(e)
-        if host:
+        unresolved = unresolved_host_message(e)
+        if unresolved:
             return {
                 "category": "network",
                 "should_retry": True,
                 "needs_reauth": False,
-                "message": (
-                    f"Cannot resolve {host} — your network returns no address for it. "
-                    "Check your router's DNS server and any ad/tracker filtering."
-                ),
+                "message": unresolved,
             }
         return {
             "category": "network",

@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any, Mapping, cast
 
 from homey import driver
 
+from ...lib.connection import unresolved_host_message
+
 if TYPE_CHECKING:
     from ...app import App
     from .device import EchoDevice
@@ -11,6 +13,29 @@ if TYPE_CHECKING:
 
 def _serial(card_arguments: Mapping[str, Any]) -> str:
     return card_arguments["device"].get_data()["id"]
+
+
+def _explained(handler):
+    """Wrap a run listener so a DNS failure says so on the card.
+
+    Homey shows whatever a run listener raises, and everything that fails in
+    transport arrives here as `CannotConnect: Connection error during GET`.
+    That text has cost real users days: it reads like the app is broken when the
+    network never returned an address for alexa.amazon.<tld>. Only that one case
+    is rewritten; anything else keeps its original exception so the app log and a
+    diagnostic report still carry the exact type.
+    """
+
+    async def run(args: Mapping[str, Any], **kwargs):
+        try:
+            return await handler(args, **kwargs)
+        except Exception as e:
+            explanation = unresolved_host_message(e)
+            if explanation is None:
+                raise
+            raise RuntimeError(explanation) from e
+
+    return run
 
 
 class EchoDriver(driver.Driver):
@@ -87,32 +112,32 @@ class EchoDriver(driver.Driver):
             False: flow.get_device_trigger_card("do-not-disturb-turned-off"),
         }
         flow.get_condition_card("do-not-disturb-is-on").register_run_listener(on_dnd_is_on)
-        flow.get_action_card("set-do-not-disturb").register_run_listener(on_set_dnd)
+        flow.get_action_card("set-do-not-disturb").register_run_listener(_explained(on_set_dnd))
 
         self._screen_triggers = {
             True: flow.get_device_trigger_card("screen-turned-on"),
             False: flow.get_device_trigger_card("screen-turned-off"),
         }
         flow.get_condition_card("screen-is-on").register_run_listener(on_screen_is_on)
-        flow.get_action_card("set-screen").register_run_listener(on_set_screen)
+        flow.get_action_card("set-screen").register_run_listener(_explained(on_set_screen))
         flow.get_condition_card("adaptive-brightness-is-on").register_run_listener(
             on_adaptive_brightness_is_on
         )
         flow.get_action_card("set-adaptive-brightness").register_run_listener(
-            on_set_adaptive_brightness
+            _explained(on_set_adaptive_brightness)
         )
 
-        flow.get_action_card("message").register_run_listener(on_message)
+        flow.get_action_card("message").register_run_listener(_explained(on_message))
         voice = flow.get_action_card("message_with_voice")
         voice.register_argument_autocomplete_listener("voice", autocomplete_voice)
-        voice.register_run_listener(on_message_with_voice)
-        flow.get_action_card("command").register_run_listener(on_command)
+        voice.register_run_listener(_explained(on_message_with_voice))
+        flow.get_action_card("command").register_run_listener(_explained(on_command))
         sound = flow.get_action_card("play-sound")
         sound.register_argument_autocomplete_listener("sound", autocomplete_sound)
-        sound.register_run_listener(on_sound)
+        sound.register_run_listener(_explained(on_sound))
         routine = flow.get_action_card("run-routine")
         routine.register_argument_autocomplete_listener("routine", autocomplete_routine)
-        routine.register_run_listener(on_routine)
+        routine.register_run_listener(_explained(on_routine))
 
         self.log("EchoDriver has been initialized")
 

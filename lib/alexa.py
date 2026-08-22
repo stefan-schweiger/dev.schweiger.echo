@@ -37,6 +37,7 @@ from aioamazondevices.const.sounds import SOUNDS_LIST
 from aioamazondevices.implementation import http2 as amazon_http2
 from aioamazondevices.structures import AmazonDevice, AmazonMediaControls
 
+from .connection import unresolved_host_message
 from .constants import DEVICES, VOICES
 
 VOLUME_DIVISOR = 100
@@ -65,6 +66,19 @@ RECOVERY_RESET_WINDOW_S = 240
 # Website/session cookies expire after ~24h; renewing them clears the whole
 # aiohttp cookie jar, so do it on a slow cadence rather than every heartbeat.
 COOKIE_REFRESH_INTERVAL_S = 6 * 60 * 60
+
+# How long a resolved Amazon address stays usable before we ask DNS again.
+# aiohttp defaults to 10s, which turns one login (five different hostnames) or
+# one visit to the routine picker into a burst of lookups. Some home networks
+# answer the first few and then stop: a French tester's on-device test resolved
+# alexa.amazon.fr four times in a row and then got "no address associated with
+# hostname" for every attempt after that, and his connect log failed on the
+# fifth name it looked up. The answer is a single CloudFront address with a 60s
+# TTL, so every minute something in the path has to fetch a new one and an empty
+# refresh leaves us with nothing. Deliberately outliving that TTL: it exists for
+# load balancing, the address stays reachable far longer, and a withdrawn one
+# surfaces as a connect failure that the reconnect backoff already handles.
+DNS_CACHE_TTL_S = 120
 
 # Throttles for the routine diagnostics (see list_routines / _probe_routines).
 ROUTINES_LOG_INTERVAL_S = 60
@@ -148,6 +162,10 @@ def login_error_message(e: BaseException) -> str:
     `KeyError: 'openid.oa2.authorization_code'`. Shown verbatim in app settings,
     that reads like a crash, so users retry the same code over and over (one
     report had five attempts in four minutes). Say what to do instead.
+
+    A sign-in that never resolved a hostname is the other one worth naming: it
+    surfaces as `CannotConnect: Connection error during GET`, which two testers
+    reported verbatim while hunting a problem that was never in the app.
     """
     if isinstance(e, KeyError) and AUTH_CODE_PARAM in str(e):
         return (
@@ -155,7 +173,7 @@ def login_error_message(e: BaseException) -> str:
             "and try again — if it keeps failing, open the Amazon app or website once "
             "to clear any extra verification step."
         )
-    return f"{type(e).__name__}: {e}"
+    return unresolved_host_message(e) or f"{type(e).__name__}: {e}"
 
 
 class AlexaService:
@@ -310,7 +328,11 @@ class AlexaService:
         # Homey has no IPv6 route (force IPv4) and no system CA store (use certifi's bundle).
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         self._session = aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(family=socket.AF_INET, ssl=ssl_context),
+            connector=aiohttp.TCPConnector(
+                family=socket.AF_INET,
+                ssl=ssl_context,
+                ttl_dns_cache=DNS_CACHE_TTL_S,
+            ),
             timeout=aiohttp.ClientTimeout(total=30),
         )
         self._api = AmazonEchoApi(
