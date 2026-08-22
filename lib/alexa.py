@@ -180,6 +180,8 @@ class AlexaService:
     def __init__(self, log: Callable[[str], None]):
         self._log = log
         self._session: Optional[aiohttp.ClientSession] = None
+        # Outlives the session on purpose — see _shared_connector.
+        self._connector: Optional[aiohttp.TCPConnector] = None
         self._httpx: Optional[httpx.AsyncClient] = None
         self._api: Optional[AmazonEchoApi] = None
         self._devices: dict[str, AmazonDevice] = {}
@@ -321,18 +323,33 @@ class AlexaService:
         finally:
             login._domain_refresh_auth_cookies = original
 
+    def _shared_connector(self) -> aiohttp.TCPConnector:
+        """One connector for the app's lifetime, so its DNS cache outlives a rebuild.
+
+        Every login attempt and every recovery makes a fresh `ClientSession` to
+        start from clean cookies, and the resolved-address cache lives on the
+        connector, not the session — so rebuilding both meant a second sign-in
+        attempt looked up all five hosts again, on the very networks where the
+        fifth lookup is the one that comes back empty. Cookies live in the
+        session's jar, so sharing this keeps the clean slate while making a retry
+        cost one lookup instead of five. Recreated if it was closed by stop().
+        """
+        if self._connector is None or self._connector.closed:
+            # Homey has no IPv6 route (force IPv4) and no system CA store (certifi).
+            self._connector = aiohttp.TCPConnector(
+                family=socket.AF_INET,
+                ssl=ssl.create_default_context(cafile=certifi.where()),
+                ttl_dns_cache=DNS_CACHE_TTL_S,
+            )
+        return self._connector
+
     def _build(self, email: str, password: str, login_data: Optional[dict]) -> None:
         # Fresh session — let recovery have its full budget of attempts again.
         self._recovery_attempts = 0
         self._last_recovery_ts = 0.0
-        # Homey has no IPv6 route (force IPv4) and no system CA store (use certifi's bundle).
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
         self._session = aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(
-                family=socket.AF_INET,
-                ssl=ssl_context,
-                ttl_dns_cache=DNS_CACHE_TTL_S,
-            ),
+            connector=self._shared_connector(),
+            connector_owner=False,
             timeout=aiohttp.ClientTimeout(total=30),
         )
         self._api = AmazonEchoApi(
@@ -455,6 +472,11 @@ class AlexaService:
     async def stop(self) -> None:
         async with self._connect_lock:
             await self._teardown()
+            if self._connector is not None:
+                # Only here: _teardown runs between login attempts, and the point
+                # of the shared connector is to survive that.
+                await self._connector.close()
+                self._connector = None
             await self._set_state("disconnected")
 
     async def _teardown(self) -> None:
