@@ -9,6 +9,7 @@ Volume scale: Homey uses 0-1, the Alexa API uses 0-100.
 """
 
 import asyncio
+import functools
 import json
 import socket
 import ssl
@@ -176,12 +177,53 @@ def login_error_message(e: BaseException) -> str:
     return unresolved_host_message(e) or f"{type(e).__name__}: {e}"
 
 
+def heal_stale_session(method):
+    """Refresh the session once and retry a command Amazon refused to authenticate.
+
+    The website cookies are renewed in the background every
+    COOKIE_REFRESH_INTERVAL_S without the user doing anything, and a session
+    Amazon stops accepting afterwards fails in a way that hides itself: reads and
+    the push channel carry on, so the app still shows connected, while every
+    command comes back 401/403. A user reported exactly that shape — "works for
+    12 hours, then I lose control without disconnecting" — and had to restart the
+    app to get it back. Do that restart for him.
+
+    Deliberately narrow. Only CannotAuthenticate, which the library raises for
+    401/403/407 and nothing else; a 404 arrives as CannotRetrieveData and is a
+    perfectly normal answer to, say, a playback command sent to a device with
+    nothing playing, so recovering on that would tear down and rebuild the push
+    channel every time someone pressed Next on an idle Echo.
+
+    Retrying is safe: a request Amazon refused never reached the device, so the
+    second attempt can't duplicate anything. try_recover_session() is itself
+    bounded (RECOVERY_MAX_ATTEMPTS), so a session Amazon keeps refusing falls
+    through to the original exception instead of looping.
+    """
+
+    @functools.wraps(method)
+    async def run(self, *args, **kwargs):
+        try:
+            return await method(self, *args, **kwargs)
+        except CannotAuthenticate as e:
+            self._log(
+                f"{method.__name__}: Amazon rejected the session ({e}) — "
+                "refreshing it and retrying once"
+            )
+            if not await self.try_recover_session():
+                raise
+            return await method(self, *args, **kwargs)
+
+    return run
+
+
 class AlexaService:
     def __init__(self, log: Callable[[str], None]):
         self._log = log
         self._session: Optional[aiohttp.ClientSession] = None
         # Outlives the session on purpose — see _shared_connector.
         self._connector: Optional[aiohttp.TCPConnector] = None
+        # None until first observed — see _note_csrf_state.
+        self._csrf_present: Optional[bool] = None
         self._httpx: Optional[httpx.AsyncClient] = None
         self._api: Optional[AmazonEchoApi] = None
         self._devices: dict[str, AmazonDevice] = {}
@@ -439,6 +481,7 @@ class AlexaService:
         await self._start_push_channel()
         await self._set_state("connected")
         await self.sync_dnd()
+        self._note_csrf_state("after login")
 
     def _push_client(self) -> httpx.AsyncClient:
         """The httpx client the AVS push channel runs on, created on demand.
@@ -495,6 +538,8 @@ class AlexaService:
             self._api = None
             self._devices = {}
             self._device_account_ids = {}
+            # Next session gets a fresh baseline instead of inheriting this one's.
+            self._csrf_present = None
 
     # --- session maintenance ---------------------------------------------
     async def refresh_session(self, refresh_cookies: bool = True) -> bool:
@@ -549,7 +594,30 @@ class AlexaService:
                     ss.login_stored_data["store_authentication_cookie"] = {
                         "cookie": new_cookie_value
                     }
+        self._note_csrf_state("after cookie renewal")
         return True
+
+    def _note_csrf_state(self, context: str) -> None:
+        """Log whether the library still holds a CSRF token, but only on a change.
+
+        The wrapper sends that token as a header on every request and Amazon
+        checks it on writes. clear_cookies() — which the 6-hourly cookie renewal
+        calls — also drops it, and it only comes back when some later response
+        happens to set one. If that never happens, reads keep working and every
+        command is refused, which is invisible from the outside.
+
+        One line per transition is enough to see that in a diagnostic report
+        (present at login, cleared at the renewal, and either re-acquired on the
+        next heartbeat or not) without writing a line every five minutes forever.
+        Reads a private attribute; pinned to aioamazondevices==14.2.2.
+        """
+        if self._api is None:
+            return
+        present = bool(getattr(self._api._http_wrapper, "_csrf_cookie", None))
+        if present == self._csrf_present:
+            return
+        self._csrf_present = present
+        self._log(f"CSRF token {'acquired' if present else 'cleared'} ({context})")
 
     @staticmethod
     def site_url(domain: str) -> str:
@@ -984,6 +1052,7 @@ class AlexaService:
         await self._api.sync_media_state()
         await self.sync_dnd()
         await self.ensure_push_channel()
+        self._note_csrf_state("heartbeat")
 
     # --- push handlers (library -> app) ----------------------------------
     async def _handle_volume(self, payload: dict[str, Any]) -> None:
@@ -1060,6 +1129,7 @@ class AlexaService:
                 return live
         return self._devices[serial]
 
+    @heal_stale_session
     async def say(self, serial: str, message: str, mode: str = "speak") -> None:
         device = self._device(serial)
         if mode == "announce":
@@ -1070,6 +1140,7 @@ class AlexaService:
         else:
             await self._api.call_alexa_speak(device, message)
 
+    @heal_stale_session
     async def say_with_voice(self, serial: str, message: str, voice_id: str, mode: str = "speak") -> None:
         # voice_id is "<PollyVoice>:<lang>" (e.g. "Hans:de-DE"). Rendered via SSML.
         voice, _, lang = voice_id.partition(":")
@@ -1087,12 +1158,15 @@ class AlexaService:
             key=lambda v: v["name"],
         )
 
+    @heal_stale_session
     async def execute_command(self, serial: str, text: str) -> None:
         await self._api.call_alexa_text_command(self._device(serial), text)
 
+    @heal_stale_session
     async def play_sound(self, serial: str, sound_id: str) -> None:
         await self._api.call_alexa_sound(self._device(serial), sound_id)
 
+    @heal_stale_session
     async def run_routine(self, routine_name: str) -> None:
         if self._api is None:
             raise RuntimeError("Not connected to Amazon")
@@ -1108,12 +1182,15 @@ class AlexaService:
             )
         await self._api.call_routine(routine_name)
 
+    @heal_stale_session
     async def set_volume(self, serial: str, value: float) -> None:
         await self._api.set_device_volume(self._device(serial), round(value * VOLUME_DIVISOR))
 
+    @heal_stale_session
     async def playback(self, serial: str, action: str) -> None:
         await self._api.send_media_command(self._device(serial), _PLAYBACK[action])
 
+    @heal_stale_session
     async def set_do_not_disturb(self, serial: str, enabled: bool) -> None:
         await self._api.set_do_not_disturb(self._device(serial), enabled)
 
@@ -1133,6 +1210,7 @@ class AlexaService:
             URI_DEVICE_SETTINGS.format(account_id=account_id, name=name),
         )
 
+    @heal_stale_session
     async def get_device_setting(self, serial: str, name: str) -> Any:
         """Read one device setting.
 
@@ -1156,6 +1234,7 @@ class AlexaService:
                 return value
         return value
 
+    @heal_stale_session
     async def set_device_setting(self, serial: str, name: str, value: Any) -> None:
         await self._api._http_wrapper.session_request(
             method=HTTPMethod.PUT,

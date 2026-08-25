@@ -85,5 +85,8 @@
   },
   "2.1.4": {
     "en": "The app now asks your network for Amazon's address far less often. Some home routers stop answering after a burst of lookups, which made the app fail to connect or a Flow card fail to run even though the internet was fine. Trying again after a failed sign-in no longer starts from scratch either. When a lookup does fail, app settings and Flow cards now say which address could not be resolved instead of showing a technical error."
+  },
+  "2.1.5": {
+    "en": "If Amazon stops accepting the connection after the app has been running for a while, the app now renews the connection and carries out the command anyway, instead of leaving Flow cards failing until you restart the app."
   }
 }
