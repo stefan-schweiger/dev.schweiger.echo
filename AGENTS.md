@@ -247,6 +247,9 @@ Both writes are versioned — Amazon's optimistic concurrency, per item, rejecte
 
 **Scope limit worth knowing:** this reaches *Alexa* lists only, via `alexashoppinglists/api/v2/lists` on `alexa.amazon.<tld>` — the Alexa app's own endpoint, which Amazon kept working for customers after retiring the public List Management REST API on 2024-07-01. The "Your Lists" feature on the Amazon retail site is a different product and is not reachable this way; upstream issue #1022 was closed as exactly this confusion.
 
+### DNS: unpin-on-failure resolver
+`_UnpinOnFailureResolver` (`lib/alexa.py`) is the connector's resolver. An IPv4-only lookup that fails is retried with `AF_UNSPEC` and the answer filtered back to IPv4. Measured on an affected device (log `7b57c33b`): three consecutive `alexa.amazon.de` A lookups failed with EAI_NODATA at 1-3 ms and the very next unpinned lookup of the same name succeeded in 38 ms, warming the cache for every chain hop after it. We still pin to IPv4 because Homey has no IPv6 route; the Alexa hosts have no AAAA records, so the unpinned query returns the same addresses. Both failure paths re-raise the *original* error so the user-facing message keeps the real host and EAI code, but **all three outcomes log a line** (retry worked / failed both ways / unpinned answer had no IPv4). A silent re-raise would make a report from an affected user indistinguishable from a pre-2.2.1 one, and the three cases need different answers. These lines go to the app log unconditionally, not behind the debug-logging setting, so any diagnostic report carries them.
+
 ### DNS probe (diagnostics only)
 Background and the full investigation record live in [`docs/dns-investigation.md`](docs/dns-investigation.md) — read that before re-opening this, it lists what has already been ruled out and why the app does not resolve names itself.
 

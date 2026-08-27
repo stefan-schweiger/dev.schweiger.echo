@@ -187,16 +187,88 @@ frontier chains*. It resolved the name nobody was complaining about.
 
 Fixed afterwards. The manual probe now resolves the host the app would really use
 — live session, else pinned server, else the site stored with the last login, else
-Amazon's default — and additionally probes its retail sibling
-(`alexa.amazon.fr` → `www.amazon.fr`), which is where sign-in goes. One run covers
-the command path and the sign-in path without guessing which of them broke. Note
-the stored-login fallback matters here specifically: after a failed sign-in there
-is no session and no pin, and defaulting to `amazon.com` probes a different
-marketplace than the one that failed.
+Amazon's default — and probes **three** sign-in-relevant names alongside it: that
+marketplace's retail host (`alexa.amazon.fr` → `www.amazon.fr`), where an existing
+session re-authenticates; `www.amazon.com`, where every *fresh* sign-in begins
+regardless of marketplace, since with no stored login data the library starts on
+`DEFAULT_SITE`; and `api.amazon.com` as the flat control. Deduplicated, so a US
+account does not probe the same name twice.
+
+Both of the last two matter and they are not the same name. In this log the
+failures were `alexa.amazon.fr` *and* `www.amazon.com` — a French Alexa host and
+the US retail host — so probing only the configured marketplace's sibling would
+still have missed one of them.
 
 So the decisive question is still open: at a moment when `alexa.amazon.fr` is
 failing, does DoH return an address for **that name** while the system resolver
 refuses one?
+
+## 5b. The chain walk on failing devices (2026-08-27, v2.2.0)
+
+Five probes from the two affected users, taken while failing. These are the
+sharpest measurements in the investigation.
+
+**Jeremy_Gout, `alexa.amazon.fr`** (log `96f37b5c`), every hop in one run:
+
+```
+alexa.amazon.fr                   A: FAILED errno=-5   in 2ms
+layla.amazon.com                  A: FAILED errno=-5   in 1ms
+tp.799c43337-frontier.amazon.com  A: FAILED errno=-5   in 1ms
+d3rsqup3tcxj1a.cloudfront.net     A: 3.164.158.58      in 14ms   ← resolves
+www.amazon.fr                     A: FAILED errno=-5   in 9ms
+api.amazon.com                    A: 8 records         in 2ms    ← resolves
+```
+
+Every name that is a **CNAME** fails. Every name that is an **A record**
+succeeds, and does so at network speed (14 ms) rather than cache speed. The
+failures come back in 1–2 ms. That is not a resolver that cannot reach the
+network; it is a resolver that answers alias lookups immediately with nothing.
+
+This revives the "chain without a terminal record" idea from §8, which had been
+dismissed on the strength of SergeP's `nslookup` output. That dismissal was
+wrong in the same way everything else in this thread was wrong: a PC asking one
+server directly is not the client that fails.
+
+### The decisive one: IPv4-only fails, unpinned succeeds
+
+**Jeremy_Gout, `alexa.amazon.de`** (log `7b57c33b`), consecutive lines:
+
+```
+alexa.amazon.de  A:    FAILED errno=-5   in 3ms
+alexa.amazon.de  A:    FAILED errno=-5   in 2ms
+alexa.amazon.de  A:    FAILED errno=-5   in 1ms
+alexa.amazon.de  AAAA: FAILED errno=-2   in 24ms
+alexa.amazon.de  any:  3.164.158.58      in 38ms   ← same name, no family pin
+layla.amazon.com A:    3.164.158.58      in 1ms    ← and now the chain is warm
+```
+
+The same name, in the same second, resolved as soon as the family pin was
+dropped — and the successful lookup then populated the cache so every hop
+afterwards answered in 1 ms. A probe two minutes later found everything healthy.
+
+**This implicates our own code.** The connector sets `family=socket.AF_INET`
+because Homey has no IPv6 route, so glibc sends a lone A query. Something in the
+path mishandles that but copes when both families are asked for together.
+
+Acted on in 2.2.1: `_UnpinOnFailureResolver` in `lib/alexa.py` retries an
+IPv4-only failure with `AF_UNSPEC` and filters the answer back to IPv4. The
+Alexa hosts have no AAAA records at all (the `-2` above), so the unpinned query
+returns the same addresses the pinned one should have. Verified against a
+simulated resolver across all four outcomes: success costs one call, the
+fallback returns the address and logs once, an IPv6-only answer re-raises the
+original error rather than handing aiohttp an unroutable address, and a double
+failure re-raises the original so the user-facing message keeps the real host and
+EAI code.
+
+Not yet confirmed to fix anything on a real affected device.
+
+### Also found
+
+thierry_arguimbau's 2.2.0 logs (`39ab47c8`, `c826faf5`) show `www.amazon.nl`
+failing at login while `alexa.amazon.nl` worked throughout. That request was
+`_after_login`'s list-index fetch, added in 2.2.0 — a new guaranteed failure for
+these users, on the retail host, for a feature they may never use. Removed in
+2.2.1; `_list_name()` refetches on a miss, so nothing needed it that early.
 
 ## 6. Cache-speed vs network-speed
 
@@ -334,7 +406,8 @@ does.
   posts 316–334.
 - Diagnostic reports: `de0cb987`, `e3f5e7ba`, `807dfcc4`, `66cf03a7`
   (thierry_arguimbau), `cb217590` (Jeremy_Gout), `146f2623` (SergeP, first probe
-  from an affected device).
+  from an affected device), `96f37b5c` and `7b57c33b` (Jeremy_Gout, the chain
+  walk and the AF_UNSPEC result), `39ab47c8` / `c826faf5` (thierry_arguimbau).
 - Affected: thierry_arguimbau, Jeremy_Gout, SergeP — all France / Free / Freebox.
   Unaffected control: Drako74, UK, Pi-hole + Unbound with blocking on.
 - `man 5 resolv.conf` for `MAXNS`.

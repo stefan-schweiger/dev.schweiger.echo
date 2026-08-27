@@ -40,9 +40,15 @@ DOH_TIMEOUT_S = 5
 # resolution was broken at that moment or only broken for that name.
 CONTROL_HOST = "api.amazon.com"
 
-# Sign-in goes to the retail host, not the Alexa one, and that has been seen
-# failing too (log 146f2623: `www.amazon.com` NODATA while a probe 48s later
-# resolved everything). Probed alongside so one run covers both paths.
+# Where a *fresh* sign-in begins, whatever marketplace the account is on: with no
+# stored login data the library starts on DEFAULT_SITE. Seen failing in its own
+# right (log 146f2623), so it is always probed, not just when it happens to be the
+# retail sibling of the configured host.
+SIGNIN_HOST = "www.amazon.com"
+
+
+# The retail host of the *configured* marketplace, which is where an existing
+# session re-authenticates. Distinct from SIGNIN_HOST for any non-US account.
 def _retail_sibling(host: str) -> Optional[str]:
     """"alexa.amazon.fr" -> "www.amazon.fr"; None if the name isn't an Alexa host."""
     if not host.startswith("alexa."):
@@ -224,9 +230,12 @@ async def run(
             if name != host:
                 lines.append("  " + await _lookup(name, socket.AF_INET, "A"))
 
-        retail = _retail_sibling(host)
-        if retail:
-            lines.append("  " + await _lookup(retail, socket.AF_INET, "A"))
+        # Both sign-in paths: this marketplace's retail host, and the default one
+        # a fresh sign-in uses. Deduplicated — they are the same on a US account.
+        for name in dict.fromkeys(
+            n for n in (_retail_sibling(host), SIGNIN_HOST) if n and n != host
+        ):
+            lines.append("  " + await _lookup(name, socket.AF_INET, "A"))
 
         lines.append("  " + await _lookup(CONTROL_HOST, socket.AF_INET, "A"))
         lines.append("  " + await _aliases(CONTROL_HOST))

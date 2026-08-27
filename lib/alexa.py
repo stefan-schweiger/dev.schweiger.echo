@@ -20,6 +20,7 @@ from xml.sax.saxutils import escape as escape_xml
 
 import aiohttp
 import certifi
+from aiohttp.resolver import ThreadedResolver
 import httpx
 from yarl import URL
 from aioamazondevices.api import AmazonEchoApi
@@ -232,6 +233,64 @@ def heal_stale_session(method):
     return run
 
 
+class _UnpinOnFailureResolver(ThreadedResolver):
+    """IPv4 lookups, retried without the family pin when a lone A query fails.
+
+    Measured on an affected Homey (log 7b57c33b, 2026-08-27): three consecutive
+    `alexa.amazon.de` A lookups failed with EAI_NODATA at 1-3 ms, and the very
+    next lookup of the *same name* with no family pinned succeeded in 38 ms —
+    after which every hop of the chain resolved from cache. Something between the
+    app and an answer mishandles a lone A query for a CNAME chain but copes when
+    glibc asks for both families together.
+
+    We pin to IPv4 because Homey has no IPv6 route (see _shared_connector), so
+    the retry filters the result back down to IPv4 addresses only. The Alexa
+    hosts have no AAAA records at all (`AAAA: FAILED errno=-2` in the same log),
+    so in practice the unpinned query returns exactly the addresses the pinned
+    one should have returned.
+
+    Best-effort: if the retry also fails, the original error is raised so the
+    message a user sees still names the host and the real EAI code.
+    """
+
+    def __init__(self, log: Callable[[str], None], *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._log = log
+
+    async def resolve(self, host: str, port: int = 0, family=socket.AF_INET):
+        try:
+            return await super().resolve(host, port, family)
+        except OSError as e:
+            if family != socket.AF_INET:
+                raise
+            first = e
+
+        # Log every outcome, not just the good one. A silent re-raise would make
+        # a report from an affected user look exactly like one from before this
+        # existed, and the three cases below need different answers.
+        try:
+            infos = await super().resolve(host, port, socket.AF_UNSPEC)
+        except OSError as second:
+            self._log(
+                f"dns: {host} failed both ways — IPv4 ({first}), unpinned ({second})"
+            )
+            raise first from None
+
+        ipv4 = [info for info in infos if info["family"] == socket.AF_INET]
+        if not ipv4:
+            self._log(
+                f"dns: {host} had no IPv4 answer ({first}); the unpinned retry "
+                f"returned {len(infos)} address(es), none of them IPv4"
+            )
+            raise first from None
+
+        self._log(
+            f"dns: {host} had no IPv4 answer ({first}); "
+            "retrying without the family pin worked"
+        )
+        return ipv4
+
+
 class AlexaService:
     def __init__(self, log: Callable[[str], None]):
         self._log = log
@@ -413,6 +472,7 @@ class AlexaService:
                 family=socket.AF_INET,
                 ssl=ssl.create_default_context(cafile=certifi.where()),
                 ttl_dns_cache=DNS_CACHE_TTL_S,
+                resolver=_UnpinOnFailureResolver(self._log),
             )
         return self._connector
 
@@ -496,6 +556,13 @@ class AlexaService:
         `api.todo_lists` is only refilled on the library's own daily refresh, so
         reading the property alone would hide a list made this morning — the same
         trap list_routines() works around.
+
+        Deliberately not called at login. This endpoint lives on the *retail*
+        host (www.amazon.<tld>), which is one of the names that fails on the
+        networks in docs/dns-investigation.md — 2.2.0 fetched it in _after_login
+        and put a guaranteed failure into those users' logs for a feature they
+        may never use. _list_name() refetches on a miss, so nothing needs it
+        earlier than first use.
         """
         if self._api is None:
             raise RuntimeError("Not connected to Amazon")
@@ -684,11 +751,6 @@ class AlexaService:
         self._api.on_media_state_event.freeze()
         self._api.on_todo_event.append(self._handle_todo_event)
         self._api.on_todo_event.freeze()
-        # Nothing else fills api.todo_lists in this app — see _list_name.
-        try:
-            await self._api._todo_handler.update_lists()
-        except Exception as e:  # noqa: BLE001 — must never break login
-            self._log(f"list index: initial fetch failed: {type(e).__name__}: {e}")
         self._log("login: devices fetched; opening HTTP/2 push channel …")
         await self._start_push_channel()
         await self._set_state("connected")
