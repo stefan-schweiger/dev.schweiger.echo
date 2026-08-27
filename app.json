@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "2.1.6",
+  "version": "2.2.0",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -150,6 +150,153 @@
         "id": "error"
       },
       {
+        "title": {
+          "en": "An item was added to a list",
+          "de": "Ein Eintrag wurde einer Liste hinzugefügt",
+          "fr": "Un article a été ajouté à une liste",
+          "nl": "Een item is toegevoegd aan een lijst",
+          "it": "Un elemento è stato aggiunto a un elenco",
+          "es": "Se ha añadido un artículo a una lista",
+          "sv": "Ett objekt lades till i en lista",
+          "no": "Et element ble lagt til i en liste",
+          "da": "Et element blev tilføjet til en liste",
+          "pl": "Element został dodany do listy",
+          "ru": "Элемент добавлен в список",
+          "ko": "목록에 항목이 추가되었습니다"
+        },
+        "tokens": [
+          {
+            "type": "string",
+            "name": "item",
+            "title": {
+              "en": "item",
+              "de": "Eintrag",
+              "fr": "article",
+              "nl": "item",
+              "it": "elemento",
+              "es": "artículo",
+              "sv": "objekt",
+              "no": "element",
+              "da": "element",
+              "pl": "element",
+              "ru": "элемент",
+              "ko": "항목"
+            },
+            "example": {
+              "en": "Milk",
+              "de": "Milch",
+              "fr": "Lait",
+              "nl": "Melk",
+              "it": "Latte",
+              "es": "Leche",
+              "sv": "Mjölk",
+              "no": "Melk",
+              "da": "Mælk",
+              "pl": "Mleko",
+              "ru": "Молоко",
+              "ko": "우유"
+            }
+          },
+          {
+            "type": "string",
+            "name": "list",
+            "title": {
+              "en": "list",
+              "de": "Liste",
+              "fr": "liste",
+              "nl": "lijst",
+              "it": "elenco",
+              "es": "lista",
+              "sv": "lista",
+              "no": "liste",
+              "da": "liste",
+              "pl": "lista",
+              "ru": "список",
+              "ko": "목록"
+            },
+            "example": {
+              "en": "Shopping List",
+              "de": "Einkaufsliste",
+              "fr": "Liste de courses",
+              "nl": "Boodschappenlijst",
+              "it": "Lista della spesa",
+              "es": "Lista de la compra",
+              "sv": "Inköpslista",
+              "no": "Handleliste",
+              "da": "Indkøbsliste",
+              "pl": "Lista zakupów",
+              "ru": "Список покупок",
+              "ko": "쇼핑 목록"
+            }
+          },
+          {
+            "type": "string",
+            "name": "item_id",
+            "title": {
+              "en": "item ID",
+              "de": "Eintrags-ID",
+              "fr": "ID de l'article",
+              "nl": "item-ID",
+              "it": "ID elemento",
+              "es": "ID del artículo",
+              "sv": "objekt-ID",
+              "no": "element-ID",
+              "da": "element-ID",
+              "pl": "ID elementu",
+              "ru": "ID элемента",
+              "ko": "항목 ID"
+            },
+            "example": {
+              "en": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "de": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "fr": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "nl": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "it": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "es": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "sv": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "no": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "da": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "pl": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "ru": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+              "ko": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14"
+            }
+          },
+          {
+            "type": "string",
+            "name": "list_id",
+            "title": {
+              "en": "list ID",
+              "de": "Listen-ID",
+              "fr": "ID de la liste",
+              "nl": "lijst-ID",
+              "it": "ID elenco",
+              "es": "ID de la lista",
+              "sv": "list-ID",
+              "no": "liste-ID",
+              "da": "liste-ID",
+              "pl": "ID listy",
+              "ru": "ID списка",
+              "ko": "목록 ID"
+            },
+            "example": {
+              "en": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "de": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "fr": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "nl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "it": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "es": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "sv": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "no": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "da": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "pl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "ru": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "ko": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0="
+            }
+          }
+        ],
+        "id": "list-item-added"
+      },
+      {
         "id": "do-not-disturb-turned-on",
         "title": {
           "en": "Do Not Disturb turned on",
@@ -246,81 +393,313 @@
         ]
       }
     ],
-    "conditions": [
-      {
-        "id": "screen-is-on",
-        "title": {
-          "en": "The screen is !{{on|off}}",
-          "de": "Der Bildschirm ist !{{eingeschaltet|ausgeschaltet}}",
-          "fr": "L'écran est !{{allumé|éteint}}",
-          "nl": "Het scherm is !{{ingeschakeld|uitgeschakeld}}",
-          "it": "Lo schermo è !{{acceso|spento}}",
-          "es": "La pantalla está !{{encendida|apagada}}",
-          "sv": "Skärmen är !{{på|av}}",
-          "no": "Skjermen er !{{på|av}}",
-          "da": "Skærmen er !{{tændt|slukket}}",
-          "pl": "Ekran jest !{{włączony|wyłączony}}",
-          "ru": "Экран !{{включён|выключен}}",
-          "ko": "화면이 !{{켜져 있으면|꺼져 있으면}}"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=echo&capabilities=onoff.display"
-          }
-        ]
-      },
-      {
-        "id": "adaptive-brightness-is-on",
-        "title": {
-          "en": "Adaptive Brightness is !{{on|off}}",
-          "de": "Automatische Helligkeit ist !{{eingeschaltet|ausgeschaltet}}",
-          "fr": "La luminosité adaptative est !{{activée|désactivée}}",
-          "nl": "Automatische helderheid is !{{ingeschakeld|uitgeschakeld}}",
-          "it": "La luminosità adattiva è !{{attivata|disattivata}}",
-          "es": "El brillo adaptativo está !{{activado|desactivado}}",
-          "sv": "Adaptiv ljusstyrka är !{{aktiverad|inaktiverad}}",
-          "no": "Adaptiv lysstyrke er !{{aktivert|deaktivert}}",
-          "da": "Adaptiv lysstyrke er !{{aktiveret|deaktiveret}}",
-          "pl": "Adaptacyjna jasność jest !{{włączona|wyłączona}}",
-          "ru": "Адаптивная яркость !{{включена|выключена}}",
-          "ko": "적응형 밝기가 !{{켜져 있으면|꺼져 있으면}}"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=echo&capabilities=adaptive_brightness"
-          }
-        ]
-      },
-      {
-        "id": "do-not-disturb-is-on",
-        "title": {
-          "en": "Do Not Disturb is !{{on|off}}",
-          "de": "Nicht stören ist !{{eingeschaltet|ausgeschaltet}}",
-          "fr": "Ne pas déranger est !{{activé|désactivé}}",
-          "nl": "Niet storen is !{{ingeschakeld|uitgeschakeld}}",
-          "it": "Non disturbare è !{{attivato|disattivato}}",
-          "es": "No molestar está !{{activado|desactivado}}",
-          "sv": "Stör ej är !{{aktiverad|inaktiverad}}",
-          "no": "Ikke forstyrr er !{{aktivert|deaktivert}}",
-          "da": "Forstyr ikke er !{{aktiveret|deaktiveret}}",
-          "pl": "Nie przeszkadzać jest !{{włączone|wyłączone}}",
-          "ru": "Режим «Не беспокоить» !{{включён|выключен}}",
-          "ko": "방해 금지가 !{{켜져 있으면|꺼져 있으면}}"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=echo"
-          }
-        ]
-      }
-    ],
     "actions": [
+      {
+        "title": {
+          "en": "Tick off an item on a list",
+          "de": "Eintrag auf einer Liste abhaken",
+          "fr": "Cocher un article d'une liste",
+          "nl": "Item op een lijst afvinken",
+          "it": "Segna un elemento come completato",
+          "es": "Marcar un artículo como completado",
+          "sv": "Markera ett objekt som klart",
+          "no": "Merk et element som fullført",
+          "da": "Marker et element som fuldført",
+          "pl": "Odhacz element na liście",
+          "ru": "Отметить элемент выполненным",
+          "ko": "목록의 항목 완료 표시"
+        },
+        "titleFormatted": {
+          "en": "Tick off item [[item]] on list [[list]]",
+          "de": "Hake Eintrag [[item]] auf Liste [[list]] ab",
+          "fr": "Cocher l'article [[item]] de la liste [[list]]",
+          "nl": "Vink item [[item]] op lijst [[list]] af",
+          "it": "Segna l'elemento [[item]] dell'elenco [[list]] come completato",
+          "es": "Marcar el artículo [[item]] de la lista [[list]] como completado",
+          "sv": "Markera objektet [[item]] på listan [[list]] som klart",
+          "no": "Merk elementet [[item]] på listen [[list]] som fullført",
+          "da": "Marker elementet [[item]] på listen [[list]] som fuldført",
+          "pl": "Odhacz element [[item]] na liście [[list]]",
+          "ru": "Отметить элемент [[item]] в списке [[list]] выполненным",
+          "ko": "목록 [[list]]의 항목 [[item]] 완료 표시"
+        },
+        "args": [
+          {
+            "type": "text",
+            "name": "list",
+            "placeholder": {
+              "en": "List ID",
+              "de": "Listen-ID",
+              "fr": "ID de la liste",
+              "nl": "Lijst-ID",
+              "it": "ID elenco",
+              "es": "ID de la lista",
+              "sv": "List-ID",
+              "no": "Liste-ID",
+              "da": "Liste-ID",
+              "pl": "ID listy",
+              "ru": "ID списка",
+              "ko": "목록 ID"
+            }
+          },
+          {
+            "type": "text",
+            "name": "item",
+            "placeholder": {
+              "en": "Item ID",
+              "de": "Eintrags-ID",
+              "fr": "ID de l'article",
+              "nl": "Item-ID",
+              "it": "ID elemento",
+              "es": "ID del artículo",
+              "sv": "Objekt-ID",
+              "no": "Element-ID",
+              "da": "Element-ID",
+              "pl": "ID elementu",
+              "ru": "ID элемента",
+              "ko": "항목 ID"
+            }
+          }
+        ],
+        "id": "complete-list-item"
+      },
+      {
+        "title": {
+          "en": "Get list items",
+          "de": "Listeneinträge abrufen",
+          "fr": "Récupérer les articles d'une liste",
+          "nl": "Lijstitems ophalen",
+          "it": "Ottieni gli elementi di un elenco",
+          "es": "Obtener los artículos de una lista",
+          "sv": "Hämta listobjekt",
+          "no": "Hent listeelementer",
+          "da": "Hent listeelementer",
+          "pl": "Pobierz elementy listy",
+          "ru": "Получить элементы списка",
+          "ko": "목록 항목 가져오기"
+        },
+        "titleFormatted": {
+          "en": "Get the items on [[list]]",
+          "de": "Rufe die Einträge von [[list]] ab",
+          "fr": "Récupérer les articles de [[list]]",
+          "nl": "Haal de items van [[list]] op",
+          "it": "Ottieni gli elementi di [[list]]",
+          "es": "Obtener los artículos de [[list]]",
+          "sv": "Hämta objekten på [[list]]",
+          "no": "Hent elementene på [[list]]",
+          "da": "Hent elementerne på [[list]]",
+          "pl": "Pobierz elementy z [[list]]",
+          "ru": "Получить элементы списка [[list]]",
+          "ko": "[[list]]의 항목 가져오기"
+        },
+        "args": [
+          {
+            "type": "autocomplete",
+            "name": "list",
+            "placeholder": {
+              "en": "List",
+              "de": "Liste",
+              "fr": "Liste",
+              "nl": "Lijst",
+              "it": "Elenco",
+              "es": "Lista",
+              "sv": "Lista",
+              "no": "Liste",
+              "da": "Liste",
+              "pl": "Lista",
+              "ru": "Список",
+              "ko": "목록"
+            }
+          }
+        ],
+        "tokens": [
+          {
+            "type": "string",
+            "name": "items",
+            "title": {
+              "en": "items (JSON)",
+              "de": "Einträge (JSON)",
+              "fr": "articles (JSON)",
+              "nl": "items (JSON)",
+              "it": "elementi (JSON)",
+              "es": "artículos (JSON)",
+              "sv": "objekt (JSON)",
+              "no": "elementer (JSON)",
+              "da": "elementer (JSON)",
+              "pl": "elementy (JSON)",
+              "ru": "элементы (JSON)",
+              "ko": "항목 (JSON)"
+            },
+            "example": {
+              "en": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "de": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "fr": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "nl": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "it": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "es": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "sv": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "no": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "da": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "pl": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "ru": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+              "ko": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]"
+            }
+          },
+          {
+            "type": "string",
+            "name": "names",
+            "title": {
+              "en": "open items",
+              "de": "offene Einträge",
+              "fr": "articles restants",
+              "nl": "openstaande items",
+              "it": "elementi da fare",
+              "es": "artículos pendientes",
+              "sv": "återstående objekt",
+              "no": "gjenstående elementer",
+              "da": "resterende elementer",
+              "pl": "pozostałe elementy",
+              "ru": "незавершённые элементы",
+              "ko": "남은 항목"
+            },
+            "example": {
+              "en": "Milk, Bread, Eggs",
+              "de": "Milch, Brot, Eier",
+              "fr": "Lait, Pain, Œufs",
+              "nl": "Melk, Brood, Eieren",
+              "it": "Latte, Pane, Uova",
+              "es": "Leche, Pan, Huevos",
+              "sv": "Mjölk, Bröd, Ägg",
+              "no": "Melk, Brød, Egg",
+              "da": "Mælk, Brød, Æg",
+              "pl": "Mleko, Chleb, Jajka",
+              "ru": "Молоко, Хлеб, Яйца",
+              "ko": "우유, 빵, 달걀"
+            }
+          },
+          {
+            "type": "number",
+            "name": "count",
+            "title": {
+              "en": "number of items",
+              "de": "Anzahl der Einträge",
+              "fr": "nombre d'articles",
+              "nl": "aantal items",
+              "it": "numero di elementi",
+              "es": "número de artículos",
+              "sv": "antal objekt",
+              "no": "antall elementer",
+              "da": "antal elementer",
+              "pl": "liczba elementów",
+              "ru": "количество элементов",
+              "ko": "항목 수"
+            },
+            "example": 3
+          },
+          {
+            "type": "string",
+            "name": "list_id",
+            "title": {
+              "en": "list ID",
+              "de": "Listen-ID",
+              "fr": "ID de la liste",
+              "nl": "lijst-ID",
+              "it": "ID elenco",
+              "es": "ID de la lista",
+              "sv": "list-ID",
+              "no": "liste-ID",
+              "da": "liste-ID",
+              "pl": "ID listy",
+              "ru": "ID списка",
+              "ko": "목록 ID"
+            },
+            "example": {
+              "en": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "de": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "fr": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "nl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "it": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "es": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "sv": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "no": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "da": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "pl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "ru": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+              "ko": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0="
+            }
+          }
+        ],
+        "id": "get-list-items"
+      },
+      {
+        "title": {
+          "en": "Remove an item from a list",
+          "de": "Eintrag von einer Liste entfernen",
+          "fr": "Supprimer un article d'une liste",
+          "nl": "Item van een lijst verwijderen",
+          "it": "Rimuovi un elemento da un elenco",
+          "es": "Eliminar un artículo de una lista",
+          "sv": "Ta bort ett objekt från en lista",
+          "no": "Fjern et element fra en liste",
+          "da": "Fjern et element fra en liste",
+          "pl": "Usuń element z listy",
+          "ru": "Удалить элемент из списка",
+          "ko": "목록에서 항목 삭제"
+        },
+        "titleFormatted": {
+          "en": "Remove item [[item]] from list [[list]]",
+          "de": "Entferne Eintrag [[item]] von Liste [[list]]",
+          "fr": "Supprimer l'article [[item]] de la liste [[list]]",
+          "nl": "Verwijder item [[item]] van lijst [[list]]",
+          "it": "Rimuovi l'elemento [[item]] dall'elenco [[list]]",
+          "es": "Eliminar el artículo [[item]] de la lista [[list]]",
+          "sv": "Ta bort objektet [[item]] från listan [[list]]",
+          "no": "Fjern elementet [[item]] fra listen [[list]]",
+          "da": "Fjern elementet [[item]] fra listen [[list]]",
+          "pl": "Usuń element [[item]] z listy [[list]]",
+          "ru": "Удалить элемент [[item]] из списка [[list]]",
+          "ko": "목록 [[list]]에서 항목 [[item]] 삭제"
+        },
+        "args": [
+          {
+            "type": "text",
+            "name": "list",
+            "placeholder": {
+              "en": "List ID",
+              "de": "Listen-ID",
+              "fr": "ID de la liste",
+              "nl": "Lijst-ID",
+              "it": "ID elenco",
+              "es": "ID de la lista",
+              "sv": "List-ID",
+              "no": "Liste-ID",
+              "da": "Liste-ID",
+              "pl": "ID listy",
+              "ru": "ID списка",
+              "ko": "목록 ID"
+            }
+          },
+          {
+            "type": "text",
+            "name": "item",
+            "placeholder": {
+              "en": "Item ID",
+              "de": "Eintrags-ID",
+              "fr": "ID de l'article",
+              "nl": "Item-ID",
+              "it": "ID elemento",
+              "es": "ID del artículo",
+              "sv": "Objekt-ID",
+              "no": "Element-ID",
+              "da": "Element-ID",
+              "pl": "ID elementu",
+              "ru": "ID элемента",
+              "ko": "항목 ID"
+            }
+          }
+        ],
+        "id": "remove-list-item"
+      },
       {
         "id": "set-screen",
         "title": {
@@ -1045,6 +1424,80 @@
               "ru": "Процедура",
               "ko": "루틴"
             }
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "screen-is-on",
+        "title": {
+          "en": "The screen is !{{on|off}}",
+          "de": "Der Bildschirm ist !{{eingeschaltet|ausgeschaltet}}",
+          "fr": "L'écran est !{{allumé|éteint}}",
+          "nl": "Het scherm is !{{ingeschakeld|uitgeschakeld}}",
+          "it": "Lo schermo è !{{acceso|spento}}",
+          "es": "La pantalla está !{{encendida|apagada}}",
+          "sv": "Skärmen är !{{på|av}}",
+          "no": "Skjermen er !{{på|av}}",
+          "da": "Skærmen er !{{tændt|slukket}}",
+          "pl": "Ekran jest !{{włączony|wyłączony}}",
+          "ru": "Экран !{{включён|выключен}}",
+          "ko": "화면이 !{{켜져 있으면|꺼져 있으면}}"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=onoff.display"
+          }
+        ]
+      },
+      {
+        "id": "adaptive-brightness-is-on",
+        "title": {
+          "en": "Adaptive Brightness is !{{on|off}}",
+          "de": "Automatische Helligkeit ist !{{eingeschaltet|ausgeschaltet}}",
+          "fr": "La luminosité adaptative est !{{activée|désactivée}}",
+          "nl": "Automatische helderheid is !{{ingeschakeld|uitgeschakeld}}",
+          "it": "La luminosità adattiva è !{{attivata|disattivata}}",
+          "es": "El brillo adaptativo está !{{activado|desactivado}}",
+          "sv": "Adaptiv ljusstyrka är !{{aktiverad|inaktiverad}}",
+          "no": "Adaptiv lysstyrke er !{{aktivert|deaktivert}}",
+          "da": "Adaptiv lysstyrke er !{{aktiveret|deaktiveret}}",
+          "pl": "Adaptacyjna jasność jest !{{włączona|wyłączona}}",
+          "ru": "Адаптивная яркость !{{включена|выключена}}",
+          "ko": "적응형 밝기가 !{{켜져 있으면|꺼져 있으면}}"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=adaptive_brightness"
+          }
+        ]
+      },
+      {
+        "id": "do-not-disturb-is-on",
+        "title": {
+          "en": "Do Not Disturb is !{{on|off}}",
+          "de": "Nicht stören ist !{{eingeschaltet|ausgeschaltet}}",
+          "fr": "Ne pas déranger est !{{activé|désactivé}}",
+          "nl": "Niet storen is !{{ingeschakeld|uitgeschakeld}}",
+          "it": "Non disturbare è !{{attivato|disattivato}}",
+          "es": "No molestar está !{{activado|desactivado}}",
+          "sv": "Stör ej är !{{aktiverad|inaktiverad}}",
+          "no": "Ikke forstyrr er !{{aktivert|deaktivert}}",
+          "da": "Forstyr ikke er !{{aktiveret|deaktiveret}}",
+          "pl": "Nie przeszkadzać jest !{{włączone|wyłączone}}",
+          "ru": "Режим «Не беспокоить» !{{включён|выключен}}",
+          "ko": "방해 금지가 !{{켜져 있으면|꺼져 있으면}}"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
           }
         ]
       }

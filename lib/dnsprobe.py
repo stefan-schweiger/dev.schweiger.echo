@@ -40,6 +40,15 @@ DOH_TIMEOUT_S = 5
 # resolution was broken at that moment or only broken for that name.
 CONTROL_HOST = "api.amazon.com"
 
+# Sign-in goes to the retail host, not the Alexa one, and that has been seen
+# failing too (log 146f2623: `www.amazon.com` NODATA while a probe 48s later
+# resolved everything). Probed alongside so one run covers both paths.
+def _retail_sibling(host: str) -> Optional[str]:
+    """"alexa.amazon.fr" -> "www.amazon.fr"; None if the name isn't an Alexa host."""
+    if not host.startswith("alexa."):
+        return None
+    return "www." + host[len("alexa.") :]
+
 # The failing name is asked for repeatedly because the failure is sticky: one
 # tester's on-device run resolved it six times and then failed every attempt
 # after that, so a single result cannot tell "flickering" from "now stuck".
@@ -214,6 +223,10 @@ async def run(
         for name in chain:
             if name != host:
                 lines.append("  " + await _lookup(name, socket.AF_INET, "A"))
+
+        retail = _retail_sibling(host)
+        if retail:
+            lines.append("  " + await _lookup(retail, socket.AF_INET, "A"))
 
         lines.append("  " + await _lookup(CONTROL_HOST, socket.AF_INET, "A"))
         lines.append("  " + await _aliases(CONTROL_HOST))

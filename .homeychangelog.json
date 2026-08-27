@@ -91,5 +91,8 @@
   },
   "2.1.6": {
     "en": "Adds a 'Run network test' button to app settings. If the app cannot reach Amazon, this records exactly how your Homey looks up Amazon's addresses and what your network answers, so the result shows up in a diagnostic report. The app also runs this check by itself when a lookup fails and diagnostic logging is switched on. Volume and playback changes made elsewhere also show up faster, because the app no longer waits on voice history data it never used."
+  },
+  "2.2.0": {
+    "en": "Alexa lists are now available in Flows. New trigger: 'An item was added to a list', which runs whenever something is added to one of your Alexa lists, by voice or from the Alexa app, and gives you the item name, the list name and the ids as tags. New actions: 'Get list items', which returns the list as plain text and as JSON so a script can work with it, plus 'Remove an item from a list' and 'Tick off an item on a list', which take those tags so a Flow can act on the item it just heard about. This covers Alexa's own shopping and to-do lists, not the separate lists on the Amazon website."
   }
 }

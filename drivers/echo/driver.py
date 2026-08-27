@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Mapping, cast
 
 from homey import driver
 
-from ...lib.connection import unresolved_host_message
+from ...lib.connection import explained as _explained
 
 if TYPE_CHECKING:
     from ...app import App
@@ -13,29 +13,6 @@ if TYPE_CHECKING:
 
 def _serial(card_arguments: Mapping[str, Any]) -> str:
     return card_arguments["device"].get_data()["id"]
-
-
-def _explained(handler):
-    """Wrap a run listener so a DNS failure says so on the card.
-
-    Homey shows whatever a run listener raises, and everything that fails in
-    transport arrives here as `CannotConnect: Connection error during GET`.
-    That text has cost real users days: it reads like the app is broken when the
-    network never returned an address for alexa.amazon.<tld>. Only that one case
-    is rewritten; anything else keeps its original exception so the app log and a
-    diagnostic report still carry the exact type.
-    """
-
-    async def run(args: Mapping[str, Any], **kwargs):
-        try:
-            return await handler(args, **kwargs)
-        except Exception as e:
-            explanation = unresolved_host_message(e)
-            if explanation is None:
-                raise
-            raise RuntimeError(explanation) from e
-
-    return run
 
 
 class EchoDriver(driver.Driver):

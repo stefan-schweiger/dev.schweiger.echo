@@ -1,0 +1,68 @@
+{
+  "title": {
+    "en": "Tick off an item on a list",
+    "de": "Eintrag auf einer Liste abhaken",
+    "fr": "Cocher un article d'une liste",
+    "nl": "Item op een lijst afvinken",
+    "it": "Segna un elemento come completato",
+    "es": "Marcar un artículo como completado",
+    "sv": "Markera ett objekt som klart",
+    "no": "Merk et element som fullført",
+    "da": "Marker et element som fuldført",
+    "pl": "Odhacz element na liście",
+    "ru": "Отметить элемент выполненным",
+    "ko": "목록의 항목 완료 표시"
+  },
+  "titleFormatted": {
+    "en": "Tick off item [[item]] on list [[list]]",
+    "de": "Hake Eintrag [[item]] auf Liste [[list]] ab",
+    "fr": "Cocher l'article [[item]] de la liste [[list]]",
+    "nl": "Vink item [[item]] op lijst [[list]] af",
+    "it": "Segna l'elemento [[item]] dell'elenco [[list]] come completato",
+    "es": "Marcar el artículo [[item]] de la lista [[list]] como completado",
+    "sv": "Markera objektet [[item]] på listan [[list]] som klart",
+    "no": "Merk elementet [[item]] på listen [[list]] som fullført",
+    "da": "Marker elementet [[item]] på listen [[list]] som fuldført",
+    "pl": "Odhacz element [[item]] na liście [[list]]",
+    "ru": "Отметить элемент [[item]] в списке [[list]] выполненным",
+    "ko": "목록 [[list]]의 항목 [[item]] 완료 표시"
+  },
+  "args": [
+    {
+      "type": "text",
+      "name": "list",
+      "placeholder": {
+        "en": "List ID",
+        "de": "Listen-ID",
+        "fr": "ID de la liste",
+        "nl": "Lijst-ID",
+        "it": "ID elenco",
+        "es": "ID de la lista",
+        "sv": "List-ID",
+        "no": "Liste-ID",
+        "da": "Liste-ID",
+        "pl": "ID listy",
+        "ru": "ID списка",
+        "ko": "목록 ID"
+      }
+    },
+    {
+      "type": "text",
+      "name": "item",
+      "placeholder": {
+        "en": "Item ID",
+        "de": "Eintrags-ID",
+        "fr": "ID de l'article",
+        "nl": "Item-ID",
+        "it": "ID elemento",
+        "es": "ID del artículo",
+        "sv": "Objekt-ID",
+        "no": "Element-ID",
+        "da": "Element-ID",
+        "pl": "ID elementu",
+        "ru": "ID элемента",
+        "ko": "항목 ID"
+      }
+    }
+  ]
+}

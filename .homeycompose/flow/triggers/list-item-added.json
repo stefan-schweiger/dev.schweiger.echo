@@ -1,0 +1,146 @@
+{
+  "title": {
+    "en": "An item was added to a list",
+    "de": "Ein Eintrag wurde einer Liste hinzugefügt",
+    "fr": "Un article a été ajouté à une liste",
+    "nl": "Een item is toegevoegd aan een lijst",
+    "it": "Un elemento è stato aggiunto a un elenco",
+    "es": "Se ha añadido un artículo a una lista",
+    "sv": "Ett objekt lades till i en lista",
+    "no": "Et element ble lagt til i en liste",
+    "da": "Et element blev tilføjet til en liste",
+    "pl": "Element został dodany do listy",
+    "ru": "Элемент добавлен в список",
+    "ko": "목록에 항목이 추가되었습니다"
+  },
+  "tokens": [
+    {
+      "type": "string",
+      "name": "item",
+      "title": {
+        "en": "item",
+        "de": "Eintrag",
+        "fr": "article",
+        "nl": "item",
+        "it": "elemento",
+        "es": "artículo",
+        "sv": "objekt",
+        "no": "element",
+        "da": "element",
+        "pl": "element",
+        "ru": "элемент",
+        "ko": "항목"
+      },
+      "example": {
+        "en": "Milk",
+        "de": "Milch",
+        "fr": "Lait",
+        "nl": "Melk",
+        "it": "Latte",
+        "es": "Leche",
+        "sv": "Mjölk",
+        "no": "Melk",
+        "da": "Mælk",
+        "pl": "Mleko",
+        "ru": "Молоко",
+        "ko": "우유"
+      }
+    },
+    {
+      "type": "string",
+      "name": "list",
+      "title": {
+        "en": "list",
+        "de": "Liste",
+        "fr": "liste",
+        "nl": "lijst",
+        "it": "elenco",
+        "es": "lista",
+        "sv": "lista",
+        "no": "liste",
+        "da": "liste",
+        "pl": "lista",
+        "ru": "список",
+        "ko": "목록"
+      },
+      "example": {
+        "en": "Shopping List",
+        "de": "Einkaufsliste",
+        "fr": "Liste de courses",
+        "nl": "Boodschappenlijst",
+        "it": "Lista della spesa",
+        "es": "Lista de la compra",
+        "sv": "Inköpslista",
+        "no": "Handleliste",
+        "da": "Indkøbsliste",
+        "pl": "Lista zakupów",
+        "ru": "Список покупок",
+        "ko": "쇼핑 목록"
+      }
+    },
+    {
+      "type": "string",
+      "name": "item_id",
+      "title": {
+        "en": "item ID",
+        "de": "Eintrags-ID",
+        "fr": "ID de l'article",
+        "nl": "item-ID",
+        "it": "ID elemento",
+        "es": "ID del artículo",
+        "sv": "objekt-ID",
+        "no": "element-ID",
+        "da": "element-ID",
+        "pl": "ID elementu",
+        "ru": "ID элемента",
+        "ko": "항목 ID"
+      },
+      "example": {
+        "en": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "de": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "fr": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "nl": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "it": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "es": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "sv": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "no": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "da": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "pl": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "ru": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14",
+        "ko": "b64c20b9-4d2f-48a5-b8c2-cdacc8751b14"
+      }
+    },
+    {
+      "type": "string",
+      "name": "list_id",
+      "title": {
+        "en": "list ID",
+        "de": "Listen-ID",
+        "fr": "ID de la liste",
+        "nl": "lijst-ID",
+        "it": "ID elenco",
+        "es": "ID de la lista",
+        "sv": "list-ID",
+        "no": "liste-ID",
+        "da": "liste-ID",
+        "pl": "ID listy",
+        "ru": "ID списка",
+        "ko": "목록 ID"
+      },
+      "example": {
+        "en": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "de": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "fr": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "nl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "it": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "es": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "sv": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "no": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "da": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "pl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "ru": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "ko": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0="
+      }
+    }
+  ]
+}

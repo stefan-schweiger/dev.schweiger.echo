@@ -1,0 +1,167 @@
+{
+  "title": {
+    "en": "Get list items",
+    "de": "Listeneinträge abrufen",
+    "fr": "Récupérer les articles d'une liste",
+    "nl": "Lijstitems ophalen",
+    "it": "Ottieni gli elementi di un elenco",
+    "es": "Obtener los artículos de una lista",
+    "sv": "Hämta listobjekt",
+    "no": "Hent listeelementer",
+    "da": "Hent listeelementer",
+    "pl": "Pobierz elementy listy",
+    "ru": "Получить элементы списка",
+    "ko": "목록 항목 가져오기"
+  },
+  "titleFormatted": {
+    "en": "Get the items on [[list]]",
+    "de": "Rufe die Einträge von [[list]] ab",
+    "fr": "Récupérer les articles de [[list]]",
+    "nl": "Haal de items van [[list]] op",
+    "it": "Ottieni gli elementi di [[list]]",
+    "es": "Obtener los artículos de [[list]]",
+    "sv": "Hämta objekten på [[list]]",
+    "no": "Hent elementene på [[list]]",
+    "da": "Hent elementerne på [[list]]",
+    "pl": "Pobierz elementy z [[list]]",
+    "ru": "Получить элементы списка [[list]]",
+    "ko": "[[list]]의 항목 가져오기"
+  },
+  "args": [
+    {
+      "type": "autocomplete",
+      "name": "list",
+      "placeholder": {
+        "en": "List",
+        "de": "Liste",
+        "fr": "Liste",
+        "nl": "Lijst",
+        "it": "Elenco",
+        "es": "Lista",
+        "sv": "Lista",
+        "no": "Liste",
+        "da": "Liste",
+        "pl": "Lista",
+        "ru": "Список",
+        "ko": "목록"
+      }
+    }
+  ],
+  "tokens": [
+    {
+      "type": "string",
+      "name": "items",
+      "title": {
+        "en": "items (JSON)",
+        "de": "Einträge (JSON)",
+        "fr": "articles (JSON)",
+        "nl": "items (JSON)",
+        "it": "elementi (JSON)",
+        "es": "artículos (JSON)",
+        "sv": "objekt (JSON)",
+        "no": "elementer (JSON)",
+        "da": "elementer (JSON)",
+        "pl": "elementy (JSON)",
+        "ru": "элементы (JSON)",
+        "ko": "항목 (JSON)"
+      },
+      "example": {
+        "en": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "de": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "fr": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "nl": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "it": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "es": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "sv": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "no": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "da": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "pl": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "ru": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]",
+        "ko": "[{\"id\":\"b64c...\",\"name\":\"Milk\",\"status\":\"ACTIVE\",\"version\":1}]"
+      }
+    },
+    {
+      "type": "string",
+      "name": "names",
+      "title": {
+        "en": "open items",
+        "de": "offene Einträge",
+        "fr": "articles restants",
+        "nl": "openstaande items",
+        "it": "elementi da fare",
+        "es": "artículos pendientes",
+        "sv": "återstående objekt",
+        "no": "gjenstående elementer",
+        "da": "resterende elementer",
+        "pl": "pozostałe elementy",
+        "ru": "незавершённые элементы",
+        "ko": "남은 항목"
+      },
+      "example": {
+        "en": "Milk, Bread, Eggs",
+        "de": "Milch, Brot, Eier",
+        "fr": "Lait, Pain, Œufs",
+        "nl": "Melk, Brood, Eieren",
+        "it": "Latte, Pane, Uova",
+        "es": "Leche, Pan, Huevos",
+        "sv": "Mjölk, Bröd, Ägg",
+        "no": "Melk, Brød, Egg",
+        "da": "Mælk, Brød, Æg",
+        "pl": "Mleko, Chleb, Jajka",
+        "ru": "Молоко, Хлеб, Яйца",
+        "ko": "우유, 빵, 달걀"
+      }
+    },
+    {
+      "type": "number",
+      "name": "count",
+      "title": {
+        "en": "number of items",
+        "de": "Anzahl der Einträge",
+        "fr": "nombre d'articles",
+        "nl": "aantal items",
+        "it": "numero di elementi",
+        "es": "número de artículos",
+        "sv": "antal objekt",
+        "no": "antall elementer",
+        "da": "antal elementer",
+        "pl": "liczba elementów",
+        "ru": "количество элементов",
+        "ko": "항목 수"
+      },
+      "example": 3
+    },
+    {
+      "type": "string",
+      "name": "list_id",
+      "title": {
+        "en": "list ID",
+        "de": "Listen-ID",
+        "fr": "ID de la liste",
+        "nl": "lijst-ID",
+        "it": "ID elenco",
+        "es": "ID de la lista",
+        "sv": "list-ID",
+        "no": "liste-ID",
+        "da": "liste-ID",
+        "pl": "ID listy",
+        "ru": "ID списка",
+        "ko": "목록 ID"
+      },
+      "example": {
+        "en": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "de": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "fr": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "nl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "it": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "es": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "sv": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "no": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "da": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "pl": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "ru": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0=",
+        "ko": "YW16bjEuYWNjb3VudC5B...LVNIT1BQSU5HX0lURU0="
+      }
+    }
+  ]
+}

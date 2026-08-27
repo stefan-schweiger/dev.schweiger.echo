@@ -36,7 +36,13 @@ from aioamazondevices.const.http import (
 )
 from aioamazondevices.const.sounds import SOUNDS_LIST
 from aioamazondevices.implementation import http2 as amazon_http2
-from aioamazondevices.structures import AmazonDevice, AmazonMediaControls
+from aioamazondevices.structures import (
+    AmazonDevice,
+    AmazonListEvent,
+    AmazonListEventType,
+    AmazonListItemStatus,
+    AmazonMediaControls,
+)
 
 from .connection import unresolved_host_message
 from .constants import DEVICES, VOICES
@@ -80,6 +86,16 @@ COOKIE_REFRESH_INTERVAL_S = 6 * 60 * 60
 # load balancing, the address stays reachable far longer, and a withdrawn one
 # surfaces as a connect failure that the reconnect backoff already handles.
 DNS_CACHE_TTL_S = 120
+
+# Amazon's item fetch caps how many it will return, and the cap is below 500:
+# asking for that answers 400 Bad Request. The library hardcodes limit=100, which
+# is the value upstream ships and Home Assistant exercises daily, so stay on it.
+# The consequence is real and worth knowing: a list longer than this is read
+# truncated, and there is no pagination in the library to work around it.
+LIST_READ_LIMIT = 100
+
+# Amazon returns no listName for the two built-in lists, only a listType.
+LIST_TYPE_NAMES = {"SHOP": "Shopping List", "TODO": "To-do List"}
 
 # Throttles for the routine diagnostics (see list_routines / _probe_routines).
 ROUTINES_LOG_INTERVAL_S = 60
@@ -224,6 +240,9 @@ class AlexaService:
         self._connector: Optional[aiohttp.TCPConnector] = None
         # None until first observed — see _note_csrf_state.
         self._csrf_present: Optional[bool] = None
+        # Payload keys ARE the list-item-added card's token names, and it is
+        # forwarded verbatim — keep the two in step. See _handle_todo_event.
+        self.on_list_item: Optional[Callable[[dict], Awaitable[None]]] = None
         self._httpx: Optional[httpx.AsyncClient] = None
         self._api: Optional[AmazonEchoApi] = None
         self._devices: dict[str, AmazonDevice] = {}
@@ -440,6 +459,138 @@ class AlexaService:
 
         self._api._http2_push_event_handler = handler
 
+    async def _handle_todo_event(self, event: AmazonListEvent) -> None:
+        """Turn an item-added list event into the app's trigger.
+
+        Subscribed in _after_login rather than intercepting the push ourselves.
+        The library resolves the item for us, at the cost of one known edge: its
+        _handle_item_change_event looks the item up with an unguarded
+        `list_items[item_id]`, so if Amazon's push ever beats its own list read
+        the KeyError is swallowed by http2.py and this event never arrives.
+        Accepted deliberately — that race was raised by a review bot (upstream
+        #893, closed without the guard landing) and no user has reported it in
+        the months this has shipped in Home Assistant. A missed trigger with a
+        logged traceback is a cheaper failure than carrying our own push
+        interceptor and retry loop.
+
+        Updates and deletions come in on the same signal; only additions have a
+        card, and DELETED carries no item at all.
+        """
+        if self.on_list_item is None or event.type != AmazonListEventType.CREATED:
+            return
+        item = event.items
+        if item is None:
+            return
+        await self.on_list_item(
+            {
+                "item": item.name,
+                "list": await self._list_name(event.list_id),
+                "item_id": item.id,
+                "list_id": event.list_id,
+            }
+        )
+
+    async def list_lists(self) -> list[dict]:
+        """Alexa's lists, refetched so one created today actually shows up.
+
+        `api.todo_lists` is only refilled on the library's own daily refresh, so
+        reading the property alone would hide a list made this morning — the same
+        trap list_routines() works around.
+        """
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
+        await self._api._todo_handler.update_lists()
+        return [
+            {
+                "id": info.id,
+                "name": info.name or LIST_TYPE_NAMES.get(info.list_type, info.list_type),
+            }
+            for info in self._api.todo_lists
+        ]
+
+    async def list_items(self, list_id: str) -> list[dict]:
+        """Every item on a list, as plain dicts a Flow token can carry.
+
+        `version` is included because it is what the remove/complete actions need,
+        so a Flow can read once and act without a second lookup.
+
+        Returns at most LIST_READ_LIMIT items — see that constant.
+        """
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
+        items = await self._api.get_todo_list_items(list_id)
+        return [
+            {
+                "id": item.id,
+                "name": item.name,
+                "status": str(item.status),
+                "version": item.version,
+            }
+            for item in items.values()
+        ]
+
+    async def _live_version(self, list_id: str, item_id: str) -> int:
+        """The item's current version, which both writes require.
+
+        Amazon versions list items for optimistic concurrency and rejects a write
+        carrying a stale one, so there is no way to simply not send it. Looking it
+        up here keeps it off the Flow cards — a version is not something a user
+        should have to think about.
+
+        One read per write, and the read is capped at LIST_READ_LIMIT, so an item
+        on a list longer than that cannot be found and the write fails. Accepted:
+        no pagination exists in the library to do better.
+        """
+        items = await self._api.get_todo_list_items(list_id)
+        item = items.get(item_id)
+        if item is None:
+            raise RuntimeError(
+                f"That item was not among the {len(items)} item(s) read from "
+                f"{await self._list_name(list_id)} — it may already be gone, or the "
+                f"list is longer than the {LIST_READ_LIMIT} items Amazon returns"
+            )
+        return item.version
+
+    async def remove_list_item(self, list_id: str, item_id: str) -> None:
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
+        version = await self._live_version(list_id, item_id)
+        await self._api.delete_todo_list_item(list_id, item_id, version)
+        self._log(f"list: removed an item from {await self._list_name(list_id)}")
+
+    async def complete_list_item(self, list_id: str, item_id: str) -> None:
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
+        version = await self._live_version(list_id, item_id)
+        await self._api.set_todo_list_item_checked_status(
+            list_id, item_id, True, version
+        )
+        self._log(f"list: ticked off an item on {await self._list_name(list_id)}")
+
+    def _cached_list_name(self, list_id: str) -> Optional[str]:
+        for info in self._api.todo_lists:
+            if info.id == list_id:
+                return info.name or LIST_TYPE_NAMES.get(info.list_type, info.list_type)
+        return None
+
+    async def _list_name(self, list_id: str) -> str:
+        """Display name for a list id, refetching the index on a miss.
+
+        `api.todo_lists` is filled by the library's _refresh_basic_data(), which
+        only runs from get_devices_data() — a method this app never calls (see
+        refresh_devices). So without a fetch of our own the cache is empty for the
+        whole session and every name would come out as the raw base64 list id.
+        Seeded at login; this covers a list created since then.
+        """
+        name = self._cached_list_name(list_id)
+        if name is None:
+            try:
+                await self._api._todo_handler.update_lists()
+            except Exception as e:  # noqa: BLE001 — a name is not worth failing for
+                self._log(f"list index refresh failed: {type(e).__name__}: {e}")
+            name = self._cached_list_name(list_id)
+        return name or list_id
+
     def _skip_unused_history_fetch(self) -> None:
         """Stop the library fetching voice history nothing in this app reads.
 
@@ -531,6 +682,13 @@ class AlexaService:
         self._api.on_volume_state_event.freeze()
         self._api.on_media_state_event.append(self._handle_media)
         self._api.on_media_state_event.freeze()
+        self._api.on_todo_event.append(self._handle_todo_event)
+        self._api.on_todo_event.freeze()
+        # Nothing else fills api.todo_lists in this app — see _list_name.
+        try:
+            await self._api._todo_handler.update_lists()
+        except Exception as e:  # noqa: BLE001 — must never break login
+            self._log(f"list index: initial fetch failed: {type(e).__name__}: {e}")
         self._log("login: devices fetched; opening HTTP/2 push channel …")
         await self._start_push_channel()
         await self._set_state("connected")

@@ -1,6 +1,7 @@
 """Amazon Echo app — lifecycle, push dispatch, and web-api entrypoints."""
 
 import asyncio
+import json
 import time
 from typing import Optional
 
@@ -9,7 +10,7 @@ from homey import app
 from .lib import dnsprobe
 from .lib.alexa import AlexaService, login_error_message
 from .lib.constants import AMAZON_SITES
-from .lib.connection import categorize_error, unresolved_host
+from .lib.connection import categorize_error, explained, unresolved_host
 from .lib.diagnostics import DiagnosticLogging
 
 SYNC_INTERVAL_MS = 5 * 60 * 1000
@@ -37,6 +38,19 @@ class App(app.App):
         self.alexa.on_reauth = self._on_reauth
         self.alexa.on_login_data = self._persist_login_data
         self.alexa.on_dnd = self._on_dnd
+        self.alexa.on_list_item = self._on_list_item
+
+        # Alexa's lists are not tied to a device, so these cards are app level.
+        self._list_card = self.homey.flow.get_trigger_card("list-item-added")
+        get_items = self.homey.flow.get_action_card("get-list-items")
+        get_items.register_argument_autocomplete_listener("list", self._autocomplete_list)
+        get_items.register_run_listener(explained(self._get_list_items))
+        self.homey.flow.get_action_card("remove-list-item").register_run_listener(
+            explained(self._remove_list_item)
+        )
+        self.homey.flow.get_action_card("complete-list-item").register_run_listener(
+            explained(self._complete_list_item)
+        )
 
         login_data = self.homey.settings.get("login_data")
         email = self.homey.settings.get("email")
@@ -275,6 +289,87 @@ class App(app.App):
         await self.homey.settings.unset("login_data")
         await self.alexa.stop()
 
+    # --- shopping / to-do lists ------------------------------------------
+    async def _autocomplete_list(self, query: str, **kwargs) -> list[dict]:
+        q = (query or "").lower()
+        try:
+            lists = await self.alexa.list_lists()
+        except Exception as e:  # noqa: BLE001 - Homey can only show a list
+            # Otherwise a failure is indistinguishable from "you have no lists":
+            # Homey renders an empty picker either way.
+            self.error(f"List autocomplete failed: {type(e).__name__}: {e}")
+            return []
+        return [
+            {"name": item["name"], "data": {"id": item["id"]}}
+            for item in lists
+            if q in item["name"].lower()
+        ]
+
+    async def _get_list_items(self, args, **kwargs) -> dict:
+        """Hand the whole list to the Flow and let it do the parsing.
+
+        `items` is JSON so HomeyScript can work with it, including each item's id,
+        which is what the remove and tick-off cards take. `names` is the un-ticked
+        items as plain text, so announcing a shopping list needs no scripting at
+        all.
+        """
+        list_id = args["list"]["data"]["id"]
+        items = await self.alexa.list_items(list_id)
+        open_names = [i["name"] for i in items if i["status"] != "COMPLETE"]
+        return {
+            "items": json.dumps(items, ensure_ascii=False),
+            "names": ", ".join(open_names),
+            "count": len(items),
+            # Echoed back so the remove/tick-off cards can be fed from this one
+            # without the Flow having to know the id another way.
+            "list_id": list_id,
+        }
+
+    async def _remove_list_item(self, args, **kwargs) -> None:
+        await self.alexa.remove_list_item(args["list"], args["item"])
+
+    async def _complete_list_item(self, args, **kwargs) -> None:
+        await self.alexa.complete_list_item(args["list"], args["item"])
+
+    async def _on_list_item(self, info: dict) -> None:
+        """Fire for any Alexa list; the list name is a token so Flows can filter.
+
+        No per-list argument on the card: this SDK's FlowCardTrigger.trigger()
+        accepts tokens only (`takes from 1 to 2 positional arguments`), so there
+        is no state for a run listener to compare an argument against. Users
+        narrow it down with a Logic card on the `list` token instead.
+
+        `info` is passed straight through: AlexaService builds it with exactly the
+        keys the card declares as tokens, so there is nothing to keep in sync
+        here. Re-listing them by hand went wrong twice, and the SDK's diagnostic
+        does not help — a *missing* token is reported as `Invalid value for token
+        <name>. Expected <type> but got <class 'str'>`, because it prints
+        `type(token_name)` instead of the value's type. "got str" means absent,
+        not mistyped.
+        """
+        await self._list_card.trigger(info)
+
+    def _configured_alexa_host(self) -> str:
+        """The Alexa host this app would actually talk to, connected or not.
+
+        In order: the live session's host, the pinned server, the server stored
+        with the last login, then Amazon's default. The stored one matters — after
+        a failed sign-in there is no session and no pin, and defaulting to
+        amazon.com would probe a different marketplace than the one that broke.
+
+        The probe also resolves the retail sibling of whatever this returns
+        (alexa.amazon.fr → www.amazon.fr), which is where sign-in goes, so one run
+        covers both paths without having to guess which of them failed.
+        """
+        if self.alexa.alexa_host:
+            return self.alexa.alexa_host
+        site = self.homey.settings.get("amazon_site")
+        if not site:
+            stored = self.homey.settings.get("login_data") or {}
+            # Stored as "https://www.amazon.fr"; we want the bare domain.
+            site = str(stored.get("site", "")).removeprefix("https://www.")
+        return f"alexa.{site or 'amazon.com'}"
+
     def _maybe_probe_dns(self, e: Exception) -> None:
         """Fire the DNS diagnostic in the background after a resolution failure.
 
@@ -305,7 +400,7 @@ class App(app.App):
         which is what a diagnostic report carries, and a Homey web-api call times
         out at 10 s while the probe can take longer.
         """
-        host = host or self.alexa.alexa_host or f"alexa.{self.homey.settings.get('amazon_site') or 'amazon.com'}"
+        host = host or self._configured_alexa_host()
         self._start_dns_probe(host)
         return {"started": True, "host": host}
 

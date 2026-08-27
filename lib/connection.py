@@ -65,6 +65,32 @@ def unresolved_host_message(e: BaseException) -> Optional[str]:
     )
 
 
+def explained(handler):
+    """Wrap a Flow card run listener so a DNS failure says so on the card.
+
+    Homey shows whatever a run listener raises, and everything that fails in
+    transport arrives as `CannotConnect: Connection error during GET`. That text
+    has cost real users days: it reads like the app is broken when the network
+    never returned an address for alexa.amazon.<tld>. Only that one case is
+    rewritten; anything else keeps its original exception so the app log and a
+    diagnostic report still carry the exact type.
+
+    Lives here rather than in a driver because both device cards and app-level
+    cards need it.
+    """
+
+    async def run(args, **kwargs):
+        try:
+            return await handler(args, **kwargs)
+        except Exception as e:
+            explanation = unresolved_host_message(e)
+            if explanation is None:
+                raise
+            raise RuntimeError(explanation) from e
+
+    return run
+
+
 def categorize_error(e: Exception) -> dict:
     """Map a library exception to a category + how the app should react.
 

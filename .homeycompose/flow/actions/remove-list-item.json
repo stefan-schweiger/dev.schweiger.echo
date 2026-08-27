@@ -1,0 +1,68 @@
+{
+  "title": {
+    "en": "Remove an item from a list",
+    "de": "Eintrag von einer Liste entfernen",
+    "fr": "Supprimer un article d'une liste",
+    "nl": "Item van een lijst verwijderen",
+    "it": "Rimuovi un elemento da un elenco",
+    "es": "Eliminar un artículo de una lista",
+    "sv": "Ta bort ett objekt från en lista",
+    "no": "Fjern et element fra en liste",
+    "da": "Fjern et element fra en liste",
+    "pl": "Usuń element z listy",
+    "ru": "Удалить элемент из списка",
+    "ko": "목록에서 항목 삭제"
+  },
+  "titleFormatted": {
+    "en": "Remove item [[item]] from list [[list]]",
+    "de": "Entferne Eintrag [[item]] von Liste [[list]]",
+    "fr": "Supprimer l'article [[item]] de la liste [[list]]",
+    "nl": "Verwijder item [[item]] van lijst [[list]]",
+    "it": "Rimuovi l'elemento [[item]] dall'elenco [[list]]",
+    "es": "Eliminar el artículo [[item]] de la lista [[list]]",
+    "sv": "Ta bort objektet [[item]] från listan [[list]]",
+    "no": "Fjern elementet [[item]] fra listen [[list]]",
+    "da": "Fjern elementet [[item]] fra listen [[list]]",
+    "pl": "Usuń element [[item]] z listy [[list]]",
+    "ru": "Удалить элемент [[item]] из списка [[list]]",
+    "ko": "목록 [[list]]에서 항목 [[item]] 삭제"
+  },
+  "args": [
+    {
+      "type": "text",
+      "name": "list",
+      "placeholder": {
+        "en": "List ID",
+        "de": "Listen-ID",
+        "fr": "ID de la liste",
+        "nl": "Lijst-ID",
+        "it": "ID elenco",
+        "es": "ID de la lista",
+        "sv": "List-ID",
+        "no": "Liste-ID",
+        "da": "Liste-ID",
+        "pl": "ID listy",
+        "ru": "ID списка",
+        "ko": "목록 ID"
+      }
+    },
+    {
+      "type": "text",
+      "name": "item",
+      "placeholder": {
+        "en": "Item ID",
+        "de": "Eintrags-ID",
+        "fr": "ID de l'article",
+        "nl": "Item-ID",
+        "it": "ID elemento",
+        "es": "ID del artículo",
+        "sv": "Objekt-ID",
+        "no": "Element-ID",
+        "da": "Element-ID",
+        "pl": "ID elementu",
+        "ru": "ID элемента",
+        "ko": "항목 ID"
+      }
+    }
+  ]
+}
