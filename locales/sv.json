@@ -16,7 +16,10 @@
     "serverHint": "Låt detta stå på Automatiskt – Amazon talar om för appen vilken server ditt konto hör till. Välj ett land bara om anslutningen misslyckas för att ditt nätverk inte når den servern. Ditt val ändrar bara vilken server appen pratar med: talade meddelanden behåller språket från ditt Amazon-konto.",
     "debugLogging": "Aktivera diagnostisk loggning",
     "debugLoggingHint": "Slå bara på detta vid felsökning. Det registrerar detaljerade tekniska loggar (utan känsliga uppgifter) så att de visas i en diagnostikrapport. Återskapa problemet medan det är på, skicka en diagnostikrapport och stäng sedan av det igen.",
-    "errorOtpPage": "Amazon visade inte steget för att ange autentiseringskoden. Det beror oftast på fel e-post eller lösenord, eller att tvåstegsverifiering inte är konfigurerad med en autentiseringsapp (SMS- eller e-postkoder fungerar inte) — ibland är det bara en tillfällig säkerhetskontroll. Kontrollera din Amazon-e-post och ditt lösenord, se till att en autentiseringsapp är aktiverad under Amazon → Inloggning och säkerhet → Tvåstegsverifiering, och försök sedan igen med en ny kod."
+    "errorOtpPage": "Amazon visade inte steget för att ange autentiseringskoden. Det beror oftast på fel e-post eller lösenord, eller att tvåstegsverifiering inte är konfigurerad med en autentiseringsapp (SMS- eller e-postkoder fungerar inte) — ibland är det bara en tillfällig säkerhetskontroll. Kontrollera din Amazon-e-post och ditt lösenord, se till att en autentiseringsapp är aktiverad under Amazon → Inloggning och säkerhet → Tvåstegsverifiering, och försök sedan igen med en ny kod.",
+    "networkTest": "Kör nätverkstest",
+    "networkTestHint": "Kontrollerar hur denna Homey slår upp Amazons adresser och skriver resultatet till apploggen. Kör den medan problemet pågår och skicka sedan en diagnosrapport.",
+    "networkTestStarted": "Nätverkstest startat. Vänta några sekunder och skicka sedan en diagnosrapport."
   },
   "pair": {
     "disconnected": "Inte ansluten till Amazon. Kontrollera anslutningen i appens inställningar."

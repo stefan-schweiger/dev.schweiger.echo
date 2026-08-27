@@ -16,7 +16,10 @@
     "serverHint": "Lad denne stå på Automatisk – Amazon fortæller appen, hvilken server din konto hører til. Vælg kun et land, hvis forbindelsen fejler, fordi dit netværk ikke kan nå den server. Dit valg ændrer kun, hvilken server appen taler med: talte meddelelser beholder sproget fra din Amazon-konto.",
     "debugLogging": "Aktivér diagnostisk logning",
     "debugLoggingHint": "Slå kun dette til ved fejlfinding. Det registrerer detaljerede tekniske logfiler (uden følsomme data), så de vises i en diagnoserapport. Gengiv problemet, mens det er slået til, send en diagnoserapport, og slå det derefter fra igen.",
-    "errorOtpPage": "Amazon viste ikke trinnet til indtastning af godkendelseskoden. Det skyldes som regel en forkert e-mail eller adgangskode, eller at to-trins-bekræftelse ikke er sat op med en godkendelses-app (SMS- eller e-mailkoder virker ikke) — nogle gange er det blot et midlertidigt sikkerhedstjek. Tjek din Amazon-e-mail og adgangskode, sørg for, at en godkendelses-app er aktiveret under Amazon → Login og sikkerhed → To-trins-bekræftelse, og prøv derefter igen med en ny kode."
+    "errorOtpPage": "Amazon viste ikke trinnet til indtastning af godkendelseskoden. Det skyldes som regel en forkert e-mail eller adgangskode, eller at to-trins-bekræftelse ikke er sat op med en godkendelses-app (SMS- eller e-mailkoder virker ikke) — nogle gange er det blot et midlertidigt sikkerhedstjek. Tjek din Amazon-e-mail og adgangskode, sørg for, at en godkendelses-app er aktiveret under Amazon → Login og sikkerhed → To-trins-bekræftelse, og prøv derefter igen med en ny kode.",
+    "networkTest": "Kør netværkstest",
+    "networkTestHint": "Kontrollerer, hvordan denne Homey slår Amazons adresser op, og skriver resultatet i app-loggen. Kør den, mens problemet opstår, og send derefter en diagnoserapport.",
+    "networkTestStarted": "Netværkstest startet. Vent et par sekunder, og send derefter en diagnoserapport."
   },
   "pair": {
     "disconnected": "Ikke forbundet til Amazon. Tjek forbindelsen i appens indstillinger."

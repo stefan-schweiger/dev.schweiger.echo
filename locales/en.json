@@ -16,7 +16,10 @@
     "serverHint": "Leave this on Auto — Amazon tells the app which server your account belongs to. Pick a country only if the connection fails because your network cannot reach that server. Your choice only changes which server the app talks to: spoken messages keep the language of your Amazon account.",
     "debugLogging": "Enable diagnostic logging",
     "debugLoggingHint": "Turn this on only when troubleshooting. It records detailed technical logs (with secrets removed) so they appear in a diagnostic report. Reproduce the problem while it's on, send a diagnostic report, then turn it off again.",
-    "errorOtpPage": "Amazon didn't show the authenticator-code step. This usually means your email or password is incorrect, or that 2-step verification isn't set up with an authenticator app (SMS or email codes won't work) — occasionally it's just a temporary security check. Please double-check your Amazon email and password, make sure an authenticator app is enabled under Amazon → Login & Security → 2-step verification, then try again with a fresh code."
+    "errorOtpPage": "Amazon didn't show the authenticator-code step. This usually means your email or password is incorrect, or that 2-step verification isn't set up with an authenticator app (SMS or email codes won't work) — occasionally it's just a temporary security check. Please double-check your Amazon email and password, make sure an authenticator app is enabled under Amazon → Login & Security → 2-step verification, then try again with a fresh code.",
+    "networkTest": "Run network test",
+    "networkTestHint": "Checks how this Homey looks up Amazon's addresses and writes the result to the app log. Run it while the problem is happening, then send a diagnostic report.",
+    "networkTestStarted": "Network test started. Give it a few seconds, then send a diagnostic report."
   },
   "pair": {
     "disconnected": "Not connected to Amazon. Please check your connection in the app settings."

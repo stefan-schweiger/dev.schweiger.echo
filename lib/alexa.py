@@ -264,6 +264,18 @@ class AlexaService:
         return self._devices
 
     @property
+    def alexa_host(self) -> Optional[str]:
+        """The alexa.amazon.<tld> host this session talks to, or None if not connected.
+
+        Commands go to this name while sign-in and token refresh go to
+        api.amazon.com, which is why a session can look connected and still
+        refuse every command: only one of the two names has to stop resolving.
+        """
+        if self._api is None:
+            return None
+        return self._api._session_state_data.alexa_website_url.host
+
+    @property
     def push_is_alive(self) -> bool:
         return self._push_task is not None and not self._push_task.done()
 
@@ -404,6 +416,7 @@ class AlexaService:
         self._skip_known_customer_id_lookup()
         _allow_dnd_push_events()
         self._intercept_dnd_push_events()
+        self._skip_unused_history_fetch()
 
     def _intercept_dnd_push_events(self) -> None:
         """Handle PUSH_DND_STATE_CHANGE ourselves, delegate everything else.
@@ -426,6 +439,47 @@ class AlexaService:
             await push_event_handler(event_type, payload)
 
         self._api._http2_push_event_handler = handler
+
+    def _skip_unused_history_fetch(self) -> None:
+        """Stop the library fetching voice history nothing in this app reads.
+
+        The library treats an EqualizerStateChange push as a proxy for "somebody
+        spoke" and calls _handle_eq_event_as_history_proxy(), which sleeps 2s,
+        refreshes the CSRF and access tokens, and pulls *seven days* of voice
+        history from alexa.amazon.<tld>. Only then does _emit_history_event()
+        check whether anything subscribed — and nothing here does, so every byte
+        of it is discarded. The gate is one line too late; see the upstream note.
+
+        Three reasons that is worth suppressing rather than tolerating:
+
+        - It is an unaccounted source of lookups of alexa.amazon.<tld>, the exact
+          name that fails on the networks in the support thread, fired whenever
+          anyone in the house talks to an Echo. We count lookups carefully on the
+          login and heartbeat paths (see DNS_CACHE_TTL_S) and this bypassed all
+          of that.
+        - http2.py awaits the push handler inline in the directive stream loop,
+          so each one stalls volume/media/DND updates for the 2s sleep plus two
+          round trips.
+        - Every record is logged at DEBUG including transcriptText, personId and
+          personFirstName. With diagnostic logging on that lands in the app log
+          and therefore in the diagnostic reports we ask users to send us, so a
+          support report could carry what someone's household said to Alexa.
+
+        Replacing the bound method on the api instance rather than widening the
+        event filter keeps this independent of the DND patches above, which have
+        their own (different) upstream fix pending.
+
+        DELETE ME once upstream gates the fetch on `on_history_event.frozen`, or
+        sooner if this app ever consumes voice history — with that fix in place,
+        subscribing is all it takes to turn the fetch back on.
+        """
+        if not hasattr(self._api, "_handle_eq_event_as_history_proxy"):
+            return
+
+        async def skip() -> None:
+            return None
+
+        self._api._handle_eq_event_as_history_proxy = skip
 
     async def _handle_dnd_push(self, payload: dict[str, Any]) -> None:
         serial = (payload.get("dopplerId") or {}).get("deviceSerialNumber")

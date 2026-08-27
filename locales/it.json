@@ -16,7 +16,10 @@
     "serverHint": "Lascia questa impostazione su Automatico: Amazon indica all'app a quale server appartiene il tuo account. Scegli un paese solo se la connessione non funziona perché la tua rete non raggiunge quel server. La tua scelta cambia solo il server con cui parla l'app: i messaggi vocali mantengono la lingua del tuo account Amazon.",
     "debugLogging": "Abilita il log diagnostico",
     "debugLoggingHint": "Attivalo solo per la risoluzione dei problemi. Registra log tecnici dettagliati (senza dati sensibili) in modo che compaiano in un rapporto diagnostico. Riproduci il problema mentre è attivo, invia un rapporto diagnostico e poi disattivalo di nuovo.",
-    "errorOtpPage": "Amazon non ha mostrato il passaggio per l'inserimento del codice dell'app di autenticazione. Di solito significa che l'email o la password non sono corrette, oppure che la verifica in due passaggi non è configurata con un'app di autenticazione (i codici via SMS o email non funzionano); a volte è solo un controllo di sicurezza temporaneo. Controlla l'email e la password di Amazon, assicurati che un'app di autenticazione sia attiva in Amazon → Accesso e sicurezza → Verifica in due passaggi, quindi riprova con un nuovo codice."
+    "errorOtpPage": "Amazon non ha mostrato il passaggio per l'inserimento del codice dell'app di autenticazione. Di solito significa che l'email o la password non sono corrette, oppure che la verifica in due passaggi non è configurata con un'app di autenticazione (i codici via SMS o email non funzionano); a volte è solo un controllo di sicurezza temporaneo. Controlla l'email e la password di Amazon, assicurati che un'app di autenticazione sia attiva in Amazon → Accesso e sicurezza → Verifica in due passaggi, quindi riprova con un nuovo codice.",
+    "networkTest": "Esegui test di rete",
+    "networkTestHint": "Verifica come questo Homey risolve gli indirizzi di Amazon e scrive il risultato nel registro dell'app. Eseguilo mentre il problema è in corso, poi invia un rapporto diagnostico.",
+    "networkTestStarted": "Test di rete avviato. Attendi qualche secondo, poi invia un rapporto diagnostico."
   },
   "pair": {
     "disconnected": "Non connesso ad Amazon. Controlla la connessione nelle impostazioni dell'app."

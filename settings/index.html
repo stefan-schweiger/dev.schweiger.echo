@@ -96,6 +96,8 @@
         <span class="homey-form-checkbox-text" data-i18n="settings.debugLogging"></span>
       </label>
       <p class="homey-form-hint" data-i18n="settings.debugLoggingHint"></p>
+      <button id="network-test" class="homey-button-secondary-full" data-i18n="settings.networkTest"></button>
+      <p class="homey-form-hint" data-i18n="settings.networkTestHint"></p>
     </div>
 
     <script type="text/javascript">
@@ -198,6 +200,17 @@
               return Homey.alert(err);
             }
             e.target.dataset.previous = site;
+          });
+        });
+
+        document.getElementById('network-test').addEventListener('click', (e) => {
+          // The probe outlives this call on purpose (a web-api call times out at
+          // 10s), so the endpoint returns as soon as it has started.
+          e.target.disabled = true;
+          Homey.api('POST', '/dns-probe', {}, (err) => {
+            e.target.disabled = false;
+            if (err) return Homey.alert(err);
+            Homey.alert(Homey.__('settings.networkTestStarted'));
           });
         });
 

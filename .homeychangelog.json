@@ -88,5 +88,8 @@
   },
   "2.1.5": {
     "en": "If Amazon stops accepting the connection after the app has been running for a while, the app now renews the connection and carries out the command anyway, instead of leaving Flow cards failing until you restart the app."
+  },
+  "2.1.6": {
+    "en": "Adds a 'Run network test' button to app settings. If the app cannot reach Amazon, this records exactly how your Homey looks up Amazon's addresses and what your network answers, so the result shows up in a diagnostic report. The app also runs this check by itself when a lookup fails and diagnostic logging is switched on. Volume and playback changes made elsewhere also show up faster, because the app no longer waits on voice history data it never used."
   }
 }

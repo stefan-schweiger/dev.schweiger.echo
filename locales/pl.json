@@ -16,7 +16,10 @@
     "serverHint": "Pozostaw ustawienie Automatycznie — Amazon wskazuje aplikacji serwer, do którego należy Twoje konto. Wybierz kraj tylko wtedy, gdy połączenie nie działa, bo Twoja sieć nie może połączyć się z tym serwerem. Wybór zmienia tylko serwer, z którym łączy się aplikacja: komunikaty głosowe zachowują język Twojego konta Amazon.",
     "debugLogging": "Włącz rejestrowanie diagnostyczne",
     "debugLoggingHint": "Włącz tę opcję tylko podczas rozwiązywania problemów. Rejestruje szczegółowe dzienniki techniczne (bez danych wrażliwych), aby pojawiły się w raporcie diagnostycznym. Odtwórz problem, gdy opcja jest włączona, wyślij raport diagnostyczny, a następnie wyłącz ją ponownie.",
-    "errorOtpPage": "Amazon nie wyświetlił kroku wpisywania kodu z aplikacji uwierzytelniającej. Zwykle oznacza to nieprawidłowy adres e-mail lub hasło albo brak skonfigurowanej weryfikacji dwuetapowej z aplikacją uwierzytelniającą (kody SMS lub e-mail nie działają); czasami to tylko tymczasowa weryfikacja bezpieczeństwa. Sprawdź adres e-mail i hasło Amazon, upewnij się, że aplikacja uwierzytelniająca jest włączona w Amazon → Logowanie i bezpieczeństwo → Weryfikacja dwuetapowa, a następnie spróbuj ponownie z nowym kodem."
+    "errorOtpPage": "Amazon nie wyświetlił kroku wpisywania kodu z aplikacji uwierzytelniającej. Zwykle oznacza to nieprawidłowy adres e-mail lub hasło albo brak skonfigurowanej weryfikacji dwuetapowej z aplikacją uwierzytelniającą (kody SMS lub e-mail nie działają); czasami to tylko tymczasowa weryfikacja bezpieczeństwa. Sprawdź adres e-mail i hasło Amazon, upewnij się, że aplikacja uwierzytelniająca jest włączona w Amazon → Logowanie i bezpieczeństwo → Weryfikacja dwuetapowa, a następnie spróbuj ponownie z nowym kodem.",
+    "networkTest": "Uruchom test sieci",
+    "networkTestHint": "Sprawdza, jak ten Homey wyszukuje adresy Amazona, i zapisuje wynik w dzienniku aplikacji. Uruchom go w trakcie występowania problemu, a następnie wyślij raport diagnostyczny.",
+    "networkTestStarted": "Test sieci uruchomiony. Odczekaj kilka sekund, a następnie wyślij raport diagnostyczny."
   },
   "pair": {
     "disconnected": "Brak połączenia z Amazon. Sprawdź połączenie w ustawieniach aplikacji."

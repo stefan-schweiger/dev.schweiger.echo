@@ -20,7 +20,7 @@ class ConnectionState(str, Enum):
     ERROR = "error"
 
 
-def _unresolved_host(e: BaseException) -> Optional[str]:
+def unresolved_host(e: BaseException) -> Optional[str]:
     """Hostname from a DNS-resolution failure inside the cause chain, if any.
 
     The library funnels every transport problem into
@@ -56,7 +56,7 @@ def unresolved_host_message(e: BaseException) -> Optional[str]:
     during GET")`, and two testers spent a week suspecting their Amazon password
     while their network was simply returning no address.
     """
-    host = _unresolved_host(e)
+    host = unresolved_host(e)
     if host is None:
         return None
     return (

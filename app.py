@@ -1,16 +1,22 @@
 """Amazon Echo app — lifecycle, push dispatch, and web-api entrypoints."""
 
 import asyncio
+import time
 from typing import Optional
 
 from homey import app
 
+from .lib import dnsprobe
 from .lib.alexa import AlexaService, login_error_message
 from .lib.constants import AMAZON_SITES
-from .lib.connection import categorize_error
+from .lib.connection import categorize_error, unresolved_host
 from .lib.diagnostics import DiagnosticLogging
 
 SYNC_INTERVAL_MS = 5 * 60 * 1000
+
+# The DNS probe is itself a burst of lookups, which is the thing that appears to
+# provoke the failure it investigates, so it must not run on every heartbeat.
+DNS_PROBE_INTERVAL_S = 10 * 60
 
 
 class App(app.App):
@@ -48,6 +54,8 @@ class App(app.App):
         )
         self._pairing_reconnect_lock = asyncio.Lock()
         self._pairing_reconnect_done = False
+        self._last_dns_probe_ts = 0.0
+        self._dns_probe_task: Optional[asyncio.Task] = None
 
     async def _auto_connect(self, email: str, login_data: dict) -> None:
         self.log("Auto-connecting from stored session …")
@@ -267,6 +275,51 @@ class App(app.App):
         await self.homey.settings.unset("login_data")
         await self.alexa.stop()
 
+    def _maybe_probe_dns(self, e: Exception) -> None:
+        """Fire the DNS diagnostic in the background after a resolution failure.
+
+        Opt-in and throttled. It exists because every DNS test in the support
+        thread so far either ran on a different machine or took a different path
+        than the failing one, so nothing has ever compared two paths on the same
+        machine at the same moment. See lib/dnsprobe.py.
+
+        Backgrounded so a heartbeat is never held up by it, and the last chain it
+        learned is persisted so a run where DoH is blocked still has real names
+        to walk.
+        """
+        host = unresolved_host(e)
+        if host is None or not self.homey.settings.get("debug_logging"):
+            return
+        if time.monotonic() - self._last_dns_probe_ts < DNS_PROBE_INTERVAL_S:
+            return
+        self._start_dns_probe(host)
+
+    async def probe_dns(self, host: Optional[str] = None) -> dict:
+        """Run the DNS probe on demand, from the settings page or a support request.
+
+        Unlike the automatic path this ignores both the debug-logging gate and the
+        throttle, because it was asked for explicitly. It still stamps the throttle
+        so an automatic probe does not immediately repeat what we just measured.
+
+        Returns as soon as the probe is running: the report goes to the app log,
+        which is what a diagnostic report carries, and a Homey web-api call times
+        out at 10 s while the probe can take longer.
+        """
+        host = host or self.alexa.alexa_host or f"alexa.{self.homey.settings.get('amazon_site') or 'amazon.com'}"
+        self._start_dns_probe(host)
+        return {"started": True, "host": host}
+
+    def _start_dns_probe(self, host: str) -> None:
+        self._last_dns_probe_ts = time.monotonic()
+
+        async def probe() -> None:
+            chain = await dnsprobe.run(host, self.log, self.homey.settings.get("dns_chain"))
+            if chain:
+                await self.homey.settings.set("dns_chain", chain)
+
+        # Hold a reference: a bare create_task can be garbage collected mid-run.
+        self._dns_probe_task = asyncio.create_task(probe())
+
     async def _report_error(self, e: Exception) -> None:
         info = categorize_error(e)
         if info["needs_reauth"]:
@@ -276,6 +329,7 @@ class App(app.App):
                 return
 
         self.error(f"[{info['category']}] {info['message']}")
+        self._maybe_probe_dns(e)
         if info["category"] != "transient":
             await self.homey.flow.get_trigger_card("error").trigger({"error": info["message"]})
         if info["needs_reauth"]:

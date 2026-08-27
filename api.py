@@ -28,3 +28,9 @@ async def set_debug_logging(*, homey, query: dict, params: dict, body: dict[str,
 
 async def set_site(*, homey, query: dict, params: dict, body: dict[str, Any]) -> dict:
     return await homey.app.set_site(str(body.get("site") or ""))
+
+
+async def probe_dns(*, homey, query: dict, params: dict, body: dict) -> dict:
+    # Optional "host" overrides the server this session is on; useful for testing
+    # a name that is expected to fail.
+    return await homey.app.probe_dns(str((body or {}).get("host") or "") or None)

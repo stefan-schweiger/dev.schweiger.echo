@@ -32,6 +32,13 @@ _REDACTIONS = (
     (re.compile(r"(CSRF cookie value:\s*<)[^>]*(>)"), r"\1[REDACTED]\2"),
     # "Adding to headers: {'csrf': 'value'}"
     (re.compile(r"('csrf'\s*:\s*')[^']*(')"), r"\1[REDACTED]\2"),
+    # "Processing vocal history record: {…'transcriptText': 'turn off the lights',
+    # 'personFirstName': 'Stefan'…}" — what a household said to Alexa, and who
+    # said it. AlexaService._skip_unused_history_fetch() stops the library
+    # fetching this at all, so normally nothing here matches; this is the backstop
+    # for a library bump that renames the method that patch hooks, because these
+    # reports are something we ask users to send us.
+    (re.compile(r"(Processing vocal history record:).*", re.DOTALL), r"\1 [REDACTED]"),
 )
 
 

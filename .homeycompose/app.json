@@ -1,6 +1,6 @@
 {
   "id": "dev.schweiger.echo",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -38,6 +38,10 @@
     "set_site": {
       "method": "POST",
       "path": "/amazon-site"
+    },
+    "probe_dns": {
+      "method": "POST",
+      "path": "/dns-probe"
     }
   },
   "images": {
