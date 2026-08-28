@@ -268,15 +268,34 @@ class _UnpinOnFailureResolver(ThreadedResolver):
         # Log every outcome, not just the good one. A silent re-raise would make
         # a report from an affected user look exactly like one from before this
         # existed, and the three cases below need different answers.
+        # flags=0 on purpose. aiohttp's own resolver passes AI_ADDRCONFIG, but the
+        # call measured succeeding on an affected device used no flags, and so does
+        # Node's dns.lookup (which is how HomeyScript resolves). AI_ADDRCONFIG can
+        # suppress the AAAA half of the query on a host with no global IPv6
+        # address, which would turn this retry into a repeat of the lookup that
+        # just failed.
         try:
-            infos = await super().resolve(host, port, socket.AF_UNSPEC)
+            infos = await self._loop.getaddrinfo(
+                host, port, type=socket.SOCK_STREAM, family=socket.AF_UNSPEC, flags=0
+            )
         except OSError as second:
             self._log(
                 f"dns: {host} failed both ways — IPv4 ({first}), unpinned ({second})"
             )
             raise first from None
 
-        ipv4 = [info for info in infos if info["family"] == socket.AF_INET]
+        ipv4 = [
+            {
+                "hostname": host,
+                "host": address[0],
+                "port": address[1],
+                "family": socket.AF_INET,
+                "proto": proto,
+                "flags": socket.AI_NUMERICHOST | socket.AI_NUMERICSERV,
+            }
+            for fam, _, proto, _, address in infos
+            if fam == socket.AF_INET
+        ]
         if not ipv4:
             self._log(
                 f"dns: {host} had no IPv4 answer ({first}); the unpinned retry "
