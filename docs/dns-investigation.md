@@ -260,7 +260,27 @@ original error rather than handing aiohttp an unroutable address, and a double
 failure re-raises the original so the user-facing message keeps the real host and
 EAI code.
 
-Not yet confirmed to fix anything on a real affected device.
+**How much to believe this.** Less than the section above suggests on its own:
+
+- The unpinned lookup also **failed** in Jeremy's `.fr` probe (`any: FAILED errno=-2`).
+  So we have one instance of it converting a failure into a success and at least
+  one of it failing too.
+- Node's `dns.lookup` defaults to `family: 0` with no `hints`, i.e. it already
+  performs the unpinned query, and `net.connect` defaults to `autoSelectFamily`.
+  HomeyScript's `fetch` therefore resolves exactly the way this retry does — and
+  SergeP's HomeyScript test (post 320) failed anyway. Different user, different
+  day, intermittent fault, so it is not decisive, but it is evidence against
+  "the broad query always works".
+
+Treat `_UnpinOnFailureResolver` as a cheap opportunistic retry that costs nothing
+when things work, not as a fix. Not yet confirmed on a real affected device.
+
+**Flags matter here.** The measurement used `socket.getaddrinfo(..., flags=0)`
+(what `lib/dnsprobe.py` does, and what Node does). aiohttp's `ThreadedResolver`
+passes `AI_ADDRCONFIG`, which can suppress the AAAA half of a dual-family query
+on a host with no global IPv6 address — which would make the retry a repeat of
+the lookup that just failed. The fallback therefore calls `getaddrinfo` directly
+with `flags=0` rather than delegating to `super().resolve()`.
 
 ### Also found
 

@@ -97,5 +97,8 @@
   },
   "2.2.1": {
     "en": "Works around the address lookup failures some users have been hitting. When the app asks your network for an Amazon address and gets no answer, it now asks a second time in a slightly different way, which on the affected networks returns the address the first attempt could not find. Also removes a request during sign in that was only needed once you actually use the shopping list."
+  },
+  "2.2.2": {
+    "en": "Fixes the retry that was added in 2.2.1. It was asking your network the same question a second time instead of a different one, so it could never have helped. It now asks the way that has actually been seen to work when a lookup fails."
   }
 }
