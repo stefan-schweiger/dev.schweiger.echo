@@ -100,5 +100,8 @@
   },
   "2.2.2": {
     "en": "Fixes the retry that was added in 2.2.1. It was asking your network the same question a second time instead of a different one, so it could never have helped. It now asks the way that has actually been seen to work when a lookup fails."
+  },
+  "2.2.3": {
+    "en": "Fixes spoken messages and announcements being rejected on accounts that share an Amazon Household with another adult. The app could identify itself to Amazon as the wrong household member, which made every message fail while devices, volume and everything else kept working normally. It now recognises its own sign in. Diagnostic reports describe device ownership more accurately too."
   }
 }

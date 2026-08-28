@@ -1273,21 +1273,87 @@ class AlexaService:
         self._api._session_state_data.account_customer_id = customer_id
         self._log("login: seeded account customer id from registration")
 
+    def _own_registration_serial(self) -> Optional[str]:
+        """The serial this app install was registered under, if we know it yet."""
+        try:
+            return self._api._session_state_data.login_stored_data["device_info"][
+                "device_serial_number"
+            ]
+        except (AttributeError, KeyError, TypeError):
+            return None
+
+    def _apply_seeded_customer_id(self, device: dict, how: str) -> None:
+        self._api._session_state_data.account_customer_id = device[
+            "deviceOwnerCustomerId"
+        ]
+        self._log(f"login: recovered account customer id from device list ({how})")
+
     def _seed_customer_id_from_devices(self, body: str) -> None:
+        """Learn the directed customer id from the raw device-list response.
+
+        Amazon returns one virtual AMAZON_DEVICE_TYPE entry *per account*, with
+        that account's individual app installs nested in its `appDeviceList`. In
+        an Amazon Household the list therefore carries one such entry per adult,
+        so taking the first one can hand us a perfectly valid *directed* id that
+        belongs to somebody else: is_directed_customer_id() passes, every real
+        Echo then compares as foreign, and every Speak/Announce comes back 400
+        while reads keep working (report c68e4ea4).
+
+        So match on our own registration serial, the way the library's
+        obtain_account_customer_id() does, and fall back to the first entry only
+        when that can't be done. On a single-account setup both paths pick the
+        same id, so nothing changes for the accounts this workaround was written
+        for in the first place.
+        """
         try:
             devices = json.loads(body).get("devices", [])
         except (json.JSONDecodeError, AttributeError):
             return
-        for device in devices:
-            if (
-                device.get("deviceType") == AMAZON_DEVICE_TYPE
-                and device.get("deviceOwnerCustomerId")
-            ):
-                self._api._session_state_data.account_customer_id = device[
-                    "deviceOwnerCustomerId"
-                ]
-                self._log("login: recovered account customer id from device list")
-                return
+
+        candidates = [
+            device
+            for device in devices
+            if device
+            and device.get("deviceType") == AMAZON_DEVICE_TYPE
+            and device.get("deviceOwnerCustomerId")
+        ]
+        if not candidates:
+            return
+
+        # How many accounts are in play, logged either way. A report showing a
+        # sound match *and* devices owned by nobody we know is a real Household
+        # sharing; one showing a guess is our own bug. Without this the two are
+        # indistinguishable in a log (report f6a1b2a6).
+        if len(candidates) > 1:
+            accounts = {device["deviceOwnerCustomerId"] for device in candidates}
+            self._log(
+                f"login: device list carries {len(candidates)} app registrations "
+                f"across {len(accounts)} account(s)"
+            )
+
+        own_serial = self._own_registration_serial()
+        if own_serial:
+            for device in candidates:
+                if any(
+                    isinstance(sub, dict)
+                    and sub.get("serialNumber") == own_serial
+                    for sub in device.get("appDeviceList") or []
+                ):
+                    self._apply_seeded_customer_id(
+                        device, "matched on this app's own registration"
+                    )
+                    return
+
+        # Either Amazon stopped listing our registration — the very bug this
+        # seeding works around — or we never learned our serial. The first entry
+        # is the best guess left, and it is what every version so far has used.
+        if len(candidates) > 1:
+            self._log(
+                "login: none of them carries this app's serial — guessing the first; "
+                "if that is another Household member's account, every sequence will "
+                "come back 400 while reads keep working"
+            )
+        self._apply_seeded_customer_id(candidates[0], "first app registration listed")
 
     # --- data ------------------------------------------------------------
     async def refresh_devices(self) -> dict[str, AmazonDevice]:
@@ -1563,20 +1629,30 @@ class AlexaService:
             )
             devices = list(self._devices.values())
             own_id = ss.account_customer_id
-            household = sum(1 for d in devices if d.household_device)
             if not is_directed_customer_id(own_id):
                 # Comparing a directed deviceOwnerCustomerId against an
                 # obfuscated account id would report every device as somebody
                 # else's — say nothing rather than something false.
                 self._log(
-                    f"devices: {len(devices)} total, {household} shared via household "
+                    f"devices: {len(devices)} total "
                     "— ownership unknown (no directed customer id yet)"
                 )
                 return
             owned = sum(1 for d in devices if d.device_owner_customer_id == own_id)
+            # Distinct *foreign* owners, not AmazonDevice.household_device: that
+            # flag is `owner == account_customer_id`, i.e. exactly `owned` again,
+            # so printing it as a third figure said the same thing twice under a
+            # name that implied the opposite. How many other accounts are in play
+            # is the thing that actually distinguishes a Household from a plain
+            # wrong-id (report f6a1b2a6).
+            others = {
+                d.device_owner_customer_id
+                for d in devices
+                if d.device_owner_customer_id != own_id
+            }
             self._log(
                 f"devices: {len(devices)} total — {owned} owned by the signed-in account, "
-                f"{len(devices) - owned} owned by another account, {household} shared via household"
+                f"{len(devices) - owned} owned by {len(others)} other account(s)"
             )
         except Exception as e:  # noqa: BLE001 - diagnostics must never break login
             self._log(f"account context unavailable: {type(e).__name__}: {e}")

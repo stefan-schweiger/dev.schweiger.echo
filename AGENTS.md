@@ -145,6 +145,21 @@ obfuscated id never matches any `deviceOwnerCustomerId`, so every device reads a
 else's). Seeding therefore prefers the device list; `_seed_customer_id_from_device_list()` fetches
 it once explicitly rather than letting the library poll 30 times for the just-registered device.
 
+**Which virtual device you read it off matters.** The list carries one `AMAZON_DEVICE_TYPE`
+(`A2IVLV5VM2W81`) entry *per account*, each with that account's app installs nested in its
+`appDeviceList`. On an Amazon Household there is one per adult, so taking the first hands you a
+valid *directed* id belonging to somebody else — `is_directed_customer_id()` passes, every Echo
+reads as foreign, and every sequence POST 400s while reads keep working (report `c68e4ea4`).
+`_seed_customer_id_from_devices()` therefore matches on this install's own
+`login_stored_data["device_info"]["device_serial_number"]`, as the library's
+`obtain_account_customer_id()` does, and only falls back to the first entry (logging a warning
+when there was more than one) if that fails. Single-account setups pick the same id either way.
+
+Still open on top of this: for a household member who genuinely does *not* own the devices, the
+library sends `account_customer_id` as both `customerId` and `target.customerId`
+(`implementation/sequence.py`), which is likely wrong — `AmazonDevice.device_owner_customer_id`
+is already parsed and is the plausible value. Unverified; needs a household account to test.
+
 ### Amazon server selection (Auto vs. pinned)
 The host every request goes to comes from `login_data["site"]`. Two things set it:
 
