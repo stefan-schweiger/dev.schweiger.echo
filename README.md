@@ -13,6 +13,9 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 - **Say with Voice** - Speak (or whisper) in a specific Amazon Polly voice and language via SSML
 - **Voice commands** - Send voice commands to Echo devices remotely (same as speaking to the device)
 - **Sounds & routines** - Play notification sounds or trigger Alexa routines from Homey flows
+- **Alexa lists** - Start a flow when something is added to your shopping or to-do list, read a list into a flow, and remove or tick off items
+- **Do Not Disturb** - Silence notifications, announcements and calls per device, from a toggle or a flow
+- **Screen controls** - Turn the display on or off, set its brightness, and switch adaptive brightness for Echo devices that have a screen
 - **Speaker groups** - Control multi-room audio groups as a single device
 - **Real-time updates** - Volume changes, playback state, and media metadata sync via a persistent HTTP/2 push connection
 - **Resilient connection** - Signs in once and keeps the session alive by refreshing it automatically
@@ -25,7 +28,9 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 
 Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Australia, Germany, Spain, France, Italy, Netherlands, Sweden, Poland, Denmark, Japan, India, Brazil, Mexico, and more). Your region is **detected automatically** from your account — there is no website to select.
 
-### Flow actions
+### Flow cards
+
+**Actions**
 
 | Action | Description |
 |--------|-------------|
@@ -34,6 +39,40 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 | Tell Command | Execute a voice command on the device |
 | Play Sound | Play a notification sound (with autocomplete) |
 | Run Routine | Execute a saved Alexa routine (with autocomplete) |
+| Do Not Disturb | Turn Do Not Disturb on or off |
+| Screen | Turn the display on or off (screen devices) |
+| Adaptive Brightness | Turn adaptive brightness on or off (screen devices) |
+| Get list items | Read a list; returns the open items as text, the full list as JSON, the item count and the list ID |
+| Remove an item from a list | Delete an item, by list and item name or by the tags from the trigger |
+| Tick off an item on a list | Mark an item complete, by list and item name or by the tags from the trigger |
+
+**Triggers**
+
+| Trigger | Description |
+|---------|-------------|
+| An item was added to a list | Fires when anything is added to an Alexa list, by voice or from the Alexa app. Tags: item, list, item ID, list ID |
+| Do Not Disturb turned on / off | Fires when Do Not Disturb changes, including from the Alexa app or by voice |
+| Screen turned on / off | Fires when the display changes state (screen devices) |
+| An error occurred | Fires on a connection problem, so a flow can notify you |
+
+**Conditions**
+
+| Condition | Description |
+|-----------|-------------|
+| Do Not Disturb is on | Test whether Do Not Disturb is active |
+| The screen is on | Test whether the display is on (screen devices) |
+| Adaptive Brightness is on | Test whether adaptive brightness is active (screen devices) |
+
+> **Lists** are Alexa's own shopping and to-do lists — the ones you fill by voice or in the Alexa app.
+> They are not the separate lists on the Amazon website.
+
+> **Screen devices** (Echo Show, Echo Spot, Echo Dot with clock) also get `Display`, `Dim` and
+> `Adaptive Brightness` capabilities. These appear only on devices that actually report a screen.
+
+> **Which devices can a card pick?** The list cards and the error trigger are app-wide and take no
+> device. Every other card is limited to individual Echo devices — speaker groups are not selectable,
+> and the screen cards only offer devices that report a screen. Groups are controlled through their
+> capabilities (playback, volume, now-playing) instead.
 
 ## Signing in
 
@@ -59,7 +98,7 @@ If you're having issues connecting or controlling your Echo devices, try these s
 
 > **Note:** The session is refreshed automatically and is designed to stay connected for a long time. If Amazon invalidates it (e.g. after a password change or a security event), just re-connect in the app settings.
 
-If the issue persists after trying all steps, please [open a bug report](https://github.com/stefan-schweiger/dev.schweiger.echo/issues/new?template=bug_report.md).
+If the issue persists after trying all steps, please [open a bug report](https://github.com/stefan-schweiger/dev.schweiger.echo/issues/new?template=bug_report.yml).
 
 ## Prerequisites (development)
 
@@ -110,7 +149,9 @@ homey app run
 ├── lib/
 │   ├── alexa.py              # AlexaService - wraps aioamazondevices (login, push, commands)
 │   ├── connection.py         # ConnectionState enum + error categorization
-│   └── constants.py          # Device-icon map and Amazon Polly voice list
+│   ├── constants.py          # Device-icon map and Amazon Polly voice list
+│   ├── diagnostics.py        # Opt-in redacted debug logging for diagnostic reports
+│   └── dnsprobe.py           # DNS lookup probe behind the "Run network test" button
 ├── drivers/
 │   ├── echo/                 # Individual Echo device driver
 │   │   ├── driver.py         # Flow action registration and device pairing
@@ -134,7 +175,7 @@ The app is built on the Homey Python Apps SDK (SDK v3) and uses [`aioamazondevic
 
 **Connection handling:** On startup the app auto-connects from the stored session. The push channel reconnects on its own; a true authentication failure surfaces a re-auth prompt. Errors are categorized in [lib/connection.py](lib/connection.py) as `auth` / `network` / `transient` / `unknown`, and an `error` flow trigger card lets users automate responses to connection problems.
 
-**Known limitations:** Shuffle/repeat are read-only (the underlying library exposes no command to set them). Sounds come from a curated built-in list rather than a live fetch.
+**Known limitations:** Shuffle/repeat are read-only (the underlying library exposes no command to set them). Sounds come from a curated built-in list rather than a live fetch. Speaker groups expose no flow cards — speech, sounds, routines, Do Not Disturb and screen controls all target individual Echo devices. List cards cover Alexa's own shopping and to-do lists, not the lists on the Amazon website.
 
 ## Commands
 
@@ -151,3 +192,5 @@ We welcome contributions from the community. Please read our [Code of Conduct](C
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+The bundled Python dependencies keep their own licenses (Apache-2.0, MIT, BSD-3-Clause, MPL-2.0, PSF-2.0); their license texts ship with the app inside `python_packages/`.

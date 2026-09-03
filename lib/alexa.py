@@ -865,6 +865,11 @@ class AlexaService:
         Mirrors aioamazondevices' private AmazonLogin._refresh_auth_cookies (no
         public equivalent), but guards on the refresh result before clearing the
         jar. Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+
+        The cookie-unpacking loop below is adapted from aioamazondevices
+        (https://github.com/chemelli74/aioamazondevices), Copyright the
+        aioamazondevices authors, licensed under the Apache License 2.0. That
+        portion remains under Apache-2.0 rather than this app's MIT license.
         """
         wrapper = self._api._http_wrapper
         ss = self._api._session_state_data

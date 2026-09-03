@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & general discussion
+    url: https://community.homey.app/t/120365
+    about: Ask about setup, flows or Echo behaviour in the app's Homey Community topic.
+  - name: Feature request
+    url: https://community.homey.app/t/120365
+    about: Suggest a new device, flow card or capability in the Homey Community topic.

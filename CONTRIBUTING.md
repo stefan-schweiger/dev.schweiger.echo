@@ -1,50 +1,54 @@
-# Contributing to Athom and Homey
+# Contributing
 
-First off all, thank you for taking the time to contribute!
+Thanks for taking the time to contribute!
 
-The following is a set of guidelines for contributing to Athom and its packages, which are hosted in the [Athom Organization](https://github.com/athombv) on GitHub. These are just guidelines, not rules. Use your best judgment, and feel free to contact us if you have any questions.
+This is a community app that integrates Amazon Echo and Alexa devices into Homey.
+It is not affiliated with Amazon or with Athom/Homey.
 
-Please join our [community slack](https://slack.athom.com), if you have not done so already.
-We also have a [community forum](https://community.homey.app) for general discussions.
+## Where to go
 
+- **A bug in the app** → [open a bug report](https://github.com/stefan-schweiger/dev.schweiger.echo/issues/new?template=bug_report.yml).
+  Please work through the troubleshooting checklist in the template first — most connection problems
+  are covered there, and a diagnostic report ID makes a real difference.
+- **A question, or a feature idea** → the [Homey Community topic](https://community.homey.app/t/120365).
+  Feature discussion happens there rather than in the issue tracker.
 
-## Before submitting a bug or feature request
+## Before submitting a bug
 
-* **Have you actually read the error message**?
-* Have you searched for similar issues?
-* Have you updated homey, all apps, and the development tools (if applicable)?
-* Have you checked that it's not a problem with one of the apps you're using, rather than Homey itself?
-* Have you looked at what's involved in fixing/implementing this?
- 
-Capable programmers should always attempt to investigate and fix problems themselves before asking for others to help. Submit a pull request instead of an issue!
+- Have you read the error message in app settings, or the one on the failing Flow card?
+- Have you searched [existing issues](https://github.com/stefan-schweiger/dev.schweiger.echo/issues?q=is%3Aissue)
+  (including closed ones)?
+- Are you on the latest version of the app, and on Homey firmware 13 or newer?
+- On **Homey Self-Hosted**: does the Homey container run in **privileged mode**? Homey's Python
+  runtime does not work otherwise, so the app cannot start at all.
+- Have you turned on **Enable diagnostic logging** in app settings, reproduced the problem, and sent a
+  diagnostic report? Without it there is usually not enough detail in the logs to find the cause.
 
-## A great bug report contains
+## Pull requests
 
-* Context – what were you trying to achieve?
-* Detailed steps to reproduce the error from scratch. Try isolating the minimal amount of code needed to reproduce the error.
-* Any applicable log files or ID's.
-* Evidence you've looked into solving the problem and ideally, a theory on the cause and a possible solution.
+Development setup — prerequisites, the `homey app dependencies install` step, and the Colima recipe — is in
+[README.md](README.md). [AGENTS.md](AGENTS.md) documents the architecture, the Amazon auth model and the
+Homey networking gotchas in depth; it is worth reading before changing anything in `lib/alexa.py`.
 
-## A great feature request contains
+A good pull request:
 
-* The current situation.
-* How and why the current situation is problematic.
-* A detailed proposal or pull request that demonstrates how the problem could be solved.
-* A use case – who needs this feature and why?
-* Any caveats.
+- **Is scoped to one thing.** Unrelated changes belong in their own PR.
+- **Edits the right files.** `app.json` is generated from `.homeycompose/` — never edit it directly.
+  `python_packages/` and `.python_cache/` are generated too.
+- **Uses relative imports.** The app loads as package `app`; see [AGENTS.md](AGENTS.md).
+- **Adds new dependencies via the manifest.** Use `homey app dependencies add`, which updates
+  `pythonPackages` — don't hand-edit the bundled packages.
+- **Is tested on a real Homey.** There is no test framework; run `homey app run` and exercise the change.
+  Say in the PR what you tested and on which Echo models.
+- **Updates the docs it invalidates** — `README.md`, `AGENTS.md`, the locale files, or the changelog entry.
+- **Adds locale strings for all languages** if it touches user-facing text (`locales/` has en, de, fr, nl).
+  An English-only string is fine if you cannot translate it; say so and it will be filled in.
 
-## A great pull request contains
+If your change affects how the app talks to Amazon, please note whether it depends on behaviour of a
+specific `aioamazondevices` version — several places in `lib/alexa.py` are deliberately pinned to the
+version in the manifest and carry a comment saying so.
 
-* Minimal changes. Only submit code relevant to the current issue. Other changes should go in new pull requests.
-* Minimal commits. Please squash to a single commit before sending your pull request.
-* No conflicts. Please rebase off the latest master before submitting.
-* Code conforming to the existing conventions and formats. i.e. Please don't reformat whitespace.
-* Passing tests in the test folder (if applicable). Use existing tests as a reference.
-* Relevant documentation.
+## Code of Conduct
 
-## Speeding up your pull request
-Merging pull requests takes time. While we always try to merge your pull request as soon as possible, there are certain things you can do to speed up this process.
-
-* Ask developers to review your code changes and post their feedback.
-* Ask users to test your changes and post their feedback.
-* Keep your changes to the minimal required amount, and dedicated to one issue/feature only.
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you are expected
+to uphold it.
