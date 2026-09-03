@@ -1,4 +1,4 @@
-"""Speaker-group device — same behaviour as an Echo device."""
+"""Speaker-group device — media and volume only; see driver.py for why."""
 
 from typing import TYPE_CHECKING, cast
 

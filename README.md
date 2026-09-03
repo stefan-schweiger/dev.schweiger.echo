@@ -16,7 +16,7 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 - **Alexa lists** - Start a flow when something is added to your shopping or to-do list, read a list into a flow, and remove or tick off items
 - **Do Not Disturb** - Silence notifications, announcements and calls per device, from a toggle or a flow
 - **Screen controls** - Turn the display on or off, set its brightness, and switch adaptive brightness for Echo devices that have a screen
-- **Speaker groups** - Control multi-room audio groups as a single device
+- **Speaker groups** - Multi-room audio groups appear as one device for playback and volume. Amazon only accepts media control on a group, so speech and voice commands always have to target an individual Echo
 - **Real-time updates** - Volume changes, playback state, and media metadata sync via a persistent HTTP/2 push connection
 - **Resilient connection** - Signs in once and keeps the session alive by refreshing it automatically
 
@@ -70,9 +70,14 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 > `Adaptive Brightness` capabilities. These appear only on devices that actually report a screen.
 
 > **Which devices can a card pick?** The list cards and the error trigger are app-wide and take no
-> device. Every other card is limited to individual Echo devices — speaker groups are not selectable,
-> and the screen cards only offer devices that report a screen. Groups are controlled through their
-> capabilities (playback, volume, now-playing) instead.
+> device. Every other card is limited to individual Echo devices, and the screen cards only offer
+> devices that report a screen.
+>
+> **Speaker groups are deliberately not selectable.** A multi-room group is only a media target as
+> far as Amazon is concerned: playback, volume and now-playing work on it, but speech (Say Message,
+> Say with Voice, announcements), voice commands, sounds, routines and Do Not Disturb all require an
+> individual device and are rejected for a group. Point those cards at one Echo in the group — an
+> announcement made there is still heard on that speaker.
 
 ## Signing in
 
@@ -175,7 +180,7 @@ The app is built on the Homey Python Apps SDK (SDK v3) and uses [`aioamazondevic
 
 **Connection handling:** On startup the app auto-connects from the stored session. The push channel reconnects on its own; a true authentication failure surfaces a re-auth prompt. Errors are categorized in [lib/connection.py](lib/connection.py) as `auth` / `network` / `transient` / `unknown`, and an `error` flow trigger card lets users automate responses to connection problems.
 
-**Known limitations:** Shuffle/repeat are read-only (the underlying library exposes no command to set them). Sounds come from a curated built-in list rather than a live fetch. Speaker groups expose no flow cards — speech, sounds, routines, Do Not Disturb and screen controls all target individual Echo devices. List cards cover Alexa's own shopping and to-do lists, not the lists on the Amazon website.
+**Known limitations:** Shuffle/repeat are read-only (the underlying library exposes no command to set them). Sounds come from a curated built-in list rather than a live fetch. Speaker groups are media-only: Amazon accepts playback and volume on a group but not speech, voice commands, sounds, routines or Do Not Disturb, so those cards take an individual Echo instead. List cards cover Alexa's own shopping and to-do lists, not the lists on the Amazon website.
 
 ## Commands
 

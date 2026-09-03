@@ -362,6 +362,14 @@ July 2025) — don't plan around any of these landing soon.
   The v1.x TS app had an explicit Amazon-website selector (`settings/index.html` before the
   rewrite); the Python library has none — it always starts at `amazon.com`.
 - **Screen controls only reach devices that advertise them** — `DISPLAY_POWER_TOGGLE` / `DISPLAY_BRIGHTNESS_ADJUST` / `DISPLAY_ADAPTIVE_BRIGHTNESS` in Amazon's capability list (Echo Show, Echo Spot, Dot with clock). Everything else gets no screen capabilities and the Flow cards filter themselves out. See **Device settings** below.
+- **Speaker groups (`WHA`) are a media target only** — playback, volume and now-playing work on a
+  group, but Amazon's speech and command endpoints want an individual device: Speak/Announce, `Say
+  with Voice`, `textCommand`, sounds and routines all need a real device serial, and a `WHA` serial
+  is not accepted. That, not an oversight, is why `drivers/group/` has **no**
+  `driver.flow.compose.json` and `GroupDriver.on_init` registers nothing — every card in
+  `drivers/echo/driver.flow.compose.json` is scoped `driver_id=echo` for the same reason. DND is
+  excluded on the same grounds (see **Device settings**). Don't "fix" this by widening the device
+  filter to include groups; the cards would appear and then fail at run time.
 - **No LED-ring control** — upstream's rule of thumb is *"as you cannot control them via Alexa Mobile App, we cannot as well"* ([aioamazondevices #924](https://github.com/chemelli74/aioamazondevices/issues/924)).
 
 ## i18n

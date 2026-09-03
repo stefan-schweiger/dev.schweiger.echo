@@ -1,4 +1,12 @@
-"""Speaker-group driver — pairing only (filters multi-room / WHA devices)."""
+"""Speaker-group driver — pairing only (filters multi-room / WHA devices).
+
+Deliberately registers no Flow cards. A `WHA` group is only a media target for
+Amazon: playback, volume and now-playing work on it, but Speak/Announce, `Say
+with Voice`, `textCommand`, sounds, routines and DND all need an individual
+device serial and are rejected for a group serial. Every card therefore lives on
+the echo driver, scoped `driver_id=echo`. See "Known limitations" in AGENTS.md
+before adding cards here.
+"""
 
 from typing import TYPE_CHECKING, cast
 
