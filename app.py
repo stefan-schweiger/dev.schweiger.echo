@@ -235,21 +235,30 @@ class App(app.App):
                 continue
         return None
 
-    async def _fanout(self, serial: str, action) -> None:
+    async def _apply(self, serial: str, action) -> None:
         device = self._find_device(serial)
         if device is not None:
             await action(device)
+
+    async def _fanout(self, serial: str, action) -> None:
+        """Apply to the addressed device, then mirror onto its cluster members."""
+        await self._apply(serial, action)
         amazon = self.alexa.devices.get(serial)
         if amazon is not None and len(amazon.device_cluster_members) > 1:
             for member_serial in amazon.device_cluster_members:
                 if member_serial == serial:
                     continue
-                member = self._find_device(member_serial)
-                if member is not None:
-                    await action(member)
+                await self._apply(member_serial, action)
 
     async def _on_volume(self, serial: str, value: float) -> None:
-        await self._fanout(serial, lambda d: d.apply_volume(value))
+        # No fanout, unlike media. Since aioamazondevices 15.1.1 a member's
+        # volume push also updates its parent group's cached volume to the
+        # *average* of the members, and that average now arrives in the payload
+        # — mirroring it back down would overwrite each member's real volume
+        # with it. Nothing is lost: setting a group's volume sends the sequence
+        # per cluster member, so Amazon pushes every member individually and the
+        # group tile gets the average for free.
+        await self._apply(serial, lambda d: d.apply_volume(value))
 
     async def _on_media(self, serial: str, media) -> None:
         await self._fanout(serial, lambda d: d.apply_media(media))

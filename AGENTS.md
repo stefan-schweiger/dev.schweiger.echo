@@ -11,7 +11,7 @@ A Homey app (**Python** Apps SDK v3, runs on Homey's CPython 3.14 runtime) that 
 ## Tech stack
 
 - **Language/runtime:** Python (Homey runs CPython **3.14**); `"runtime": "python"`, `"pythonVersion": "3.14"` in the manifest.
-- **Core dependency:** `aioamazondevices==14.2.2` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `beautifulsoup4`, `h2`, `yarl`, …).
+- **Core dependency:** `aioamazondevices==15.1.3` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
 - **Platform:** Homey Apps SDK v3. **Requires Homey firmware >= 13.0.0** (Python apps).
 - **No test framework.** Validate with `homey app run` against a real Homey + Amazon account.
 - Type-checking (optional, local): `homey-stubs` + pyright.
@@ -41,7 +41,7 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 
 | File | Purpose |
 |------|---------|
-| `app.py` | App lifecycle; deferred auto-connect from stored session; routes push events to devices (group events fan out to cluster members); periodic `sync` heartbeat; web-api methods; `error` flow trigger. Exports `homey_export = App`. |
+| `app.py` | App lifecycle; deferred auto-connect from stored session; routes push events to devices (group media events fan out to cluster members; volume does not); periodic `sync` heartbeat; web-api methods; `error` flow trigger. Exports `homey_export = App`. |
 | `api.py` | Web-API endpoints (`connect`/`status`/`disconnect`/`reset`); names match the manifest `api` map. `homey` is injected at call time — do **not** `from homey import Homey`. |
 | `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
 | `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
@@ -70,9 +70,19 @@ Devices reach the service via `cast(App, self.homey.app).alexa`.
 Amazon (HTTP/2 AVS push)
   → aioamazondevices on_volume_state_event / on_media_state_event
     → AlexaService callbacks (lib/alexa.py)
-      → App dispatch (app.py): find device by serial; group events fan out to cluster members
+      → App dispatch (app.py): find device by serial; group *media* events fan out to
+        cluster members (volume does not — see below)
         → EchoDevice/GroupDevice.apply_volume / apply_media
 ```
+
+**Volume is not fanned out.** Since `aioamazondevices` 15.1.1 a member's volume push also
+updates its parent speaker group's cached volume to the **average** of the members, and the
+library sends its whole volume cache on every event — so the group serial now arrives in
+payloads it never appeared in before. Mirroring that average back down onto the members
+(which `_fanout` still does for media, and did for volume up to 2.2.3) would overwrite each
+member's real volume with the average. Nothing is lost by dropping it: setting a group's volume sends the
+sequence *per cluster member*, so Amazon pushes every member individually and the group tile
+gets its average for free. Media still fans out — group media state is reported on the group.
 
 ### Device settings (screen power / brightness) — not in the library
 
@@ -273,6 +283,36 @@ Background and the full investigation record live in [`docs/dns-investigation.md
 ### SSML
 `call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.
 
+### Routines *are* device specific
+
+The library's own comment on `call_routine()` says routines aren't device specific. They are.
+Amazon stores a routine's sequence with the placeholders `ALEXA_CURRENT_DSN` /
+`ALEXA_CURRENT_DEVICE_TYPE` wherever a step was configured for **"the Alexa device you speak
+to"**, and `utils.replace_routine_placeholders()` substitutes whichever device the sequence is
+posted from (`implementation/sequence.py:_build_operation_node`). So a routine that replies on
+the device you talked to answers on the device *we* post from. Routines with no placeholders
+are genuinely device-agnostic — the payload is the routine's own sequence either way.
+
+`api.call_routine()` hardcodes `devices[api._default_device_serial]`, which would be an Echo
+the user never picked. The `run-routine` card does carry a device argument (Homey injects one
+into every card in a driver's flow compose file — check `app.json` if in doubt), so
+`AlexaService.run_routine(name, serial)` takes it and posts the sequence from that device via
+`api._sequence_handler.send_message(device, AmazonSequenceType.Routines, name)`. That is the
+only single-device entry point for a routine: `call_routine()` goes through
+`_call_alexa_command_per_cluster_member()`, which would run the whole routine once per cluster
+member if the chosen Echo were half of a stereo pair.
+
+`AlexaService._seed_default_device()` covers the fallback — `call_routine()` when the card's
+device is no longer in the session's device list. That serial is filled in only by the
+library's `_init_default_device()`, which runs inside `get_devices_data()`, the call
+`refresh_devices()` deliberately avoids (it fetches the *basic* device list; see its
+docstring), so unseeded it is `""` and the fallback dies on `KeyError: ''`. It prefers the
+first online device with a **single** cluster member, for the stereo-pair reason above plus
+the fact that a `WHA` serial isn't accepted by the sequence endpoint at all. Up to 14.2.2
+`default_device` was a lazy property with a first-online-device fallback and none of this was
+needed; 15.1.0 turned it into persisted state (`settings.json` via `set_default_device()`,
+which this app never calls) and moved the fallback out of our path.
+
 ## Driver capabilities
 
 Both `echo` and `group` support: `speaker_playing`, `speaker_next`/`speaker_prev`, `speaker_track`/`speaker_artist`/`speaker_album`, `volume_set`. `speaker_shuffle`/`speaker_repeat` are present but **read-only** (`setable: false`).
@@ -310,7 +350,13 @@ and they monkey-patch private internals.
 | Waiting on | Local code to remove | How to verify it landed |
 |---|---|---|
 | [PR #1010 — *feat: move dnd to push events*](https://github.com/chemelli74/aioamazondevices/pull/1010) (open since 2026-08-05, checks green, awaiting review) | `AlexaService._allow_dnd_push_events()` and `_intercept_dnd_push_events()` / `_handle_dnd_push()` in `lib/alexa.py` | `AmazonPushMessage.DoNotDisturbChange` exists in `structures.py` |
-| A fix gating the voice-history fetch on `on_history_event.frozen` (PR ours, not yet filed) | `AlexaService._skip_unused_history_fetch()` in `lib/alexa.py`, plus the `Processing vocal history record` pattern in `lib/diagnostics.py` | `_handle_eq_event_as_history_proxy()` in `api.py` returns early when nothing subscribed |
+
+**Landed:** the voice-history fetch is gated on `on_history_event.frozen` as of **15.1.3**
+([our PR #1045](https://github.com/chemelli74/aioamazondevices/pull/1045)), so
+`AlexaService._skip_unused_history_fetch()` is gone. Nothing here subscribes to
+`on_history_event`, so the library no longer fetches seven days of voice history on every
+"somebody spoke" push. The `Processing vocal history record` redaction in `lib/diagnostics.py`
+is kept as a backstop for the day something does subscribe.
 
 When #1010 ships, the replacement is a proper subscription rather than a patch — the PR adds
 an `on_dnd_event` Signal emitting `dict[str, bool]`, so wire it up next to the existing
@@ -337,6 +383,10 @@ July 2025) — don't plan around any of these landing soon.
 - **Shuffle/repeat are read-only** — `aioamazondevices` exposes no command to set them.
 - **Sounds** come from a curated static list (`SOUNDS_LIST` in the library), not a live fetch.
 - **Routines are triggered by name** — old "Run Routine" flows from the TS app (which stored an automationId) need the routine re-selected.
+- **A routine's "device you speak to" is the device on the flow card** — the `run-routine`
+  card posts the sequence from the Echo it names, so steps configured for the spoken-to device
+  answer there. **Fixed in 2.2.4**; up to and including 2.2.3 they answered on an arbitrary
+  Echo (the library's default device). See **Routines *are* device specific**.
 - **A stored session can stay pinned to the wrong Amazon domain (2026-08-20)** — the host for
   every request comes from `login_data["site"]` (library `api.py`), which is written **once**, at
   the tail of interactive login (`login.py`), *after* the domain sniff: `/api/welcome` →
@@ -350,7 +400,7 @@ July 2025) — don't plan around any of these landing soon.
   logout/login on the *same app version* sniffed `alexaHostName: alexa.amazon.fr` correctly and
   switched to `alexa.amazon.fr` + `fr-FR`. So the sniff itself works — the bug is that a bad pin
   is never revisited. How the original pin went wrong is not known from the logs (every library
-  version we've shipped, 14.1.3 → 14.2.2, has the same sniff, so it is not a version
+  version we've shipped, 14.1.3 → 15.1.3, has the same sniff, so it is not a version
   regression). Users on an older build can cure it by signing out and in again.
   **Fixed in 2.1.1 by `AlexaService._heal_domain_pin()`** — every stored login re-runs the sniff
   and, if the pinned host disagrees, switches the domain, re-mints the website cookies, and

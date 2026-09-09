@@ -103,5 +103,8 @@
   },
   "2.2.3": {
     "en": "Fixes spoken messages and announcements being rejected on accounts that share an Amazon Household with another adult. The app could identify itself to Amazon as the wrong household member, which made every message fail while devices, volume and everything else kept working normally. It now recognises its own sign in. Diagnostic reports describe device ownership more accurately too."
+  },
+  "2.2.4": {
+    "en": "Fixes the Run Routine flow card running the routine from the wrong speaker. It now runs from the Echo selected on the card, so a routine with a step set to answer on the device you spoke to answers there instead of on an arbitrary Echo. A speaker group's volume now follows its members: change one speaker and the group shows their average. Also updates the Amazon library the app talks through."
   }
 }

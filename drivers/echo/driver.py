@@ -60,7 +60,10 @@ class EchoDriver(driver.Driver):
             return [{"name": name, "data": {"name": name}} for name in names if q in name.lower()]
 
         async def on_routine(args: Mapping[str, Any], **kwargs) -> None:
-            await self._alexa.run_routine(args["routine"]["data"]["name"])
+            # The device matters: a routine step set to answer on "the Alexa
+            # device you speak to" is spoken by whichever device the sequence is
+            # posted from. See AlexaService.run_routine.
+            await self._alexa.run_routine(args["routine"]["data"]["name"], _serial(args))
 
         async def on_set_dnd(args: Mapping[str, Any], **kwargs) -> None:
             await args["device"].set_dnd(args["state"] == "on")

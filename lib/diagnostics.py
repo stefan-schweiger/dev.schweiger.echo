@@ -12,8 +12,11 @@ short-lived secrets at DEBUG (the bearer access token inside request headers, th
 CSRF cookie value). We redact those here before anything leaves the app; the
 library already scrubs its structured JSON dumps (see utils.scrub_fields).
 
-Pinned to aioamazondevices==14.2.2 — re-check the redaction patterns on library
+Pinned to aioamazondevices==15.1.3 — re-check the redaction patterns on library
 bumps against the sensitive DEBUG lines in http_wrapper.session_request / login.
+As of 15.1.3 the library's own scrub list covers `Authorization`,
+`anti-csrftoken-a2z` and `secureSessionToken`, so the header patterns below are
+backstops; the raw `CSRF cookie value: <…>` line is still logged unscrubbed.
 """
 
 import logging
@@ -34,10 +37,11 @@ _REDACTIONS = (
     (re.compile(r"('csrf'\s*:\s*')[^']*(')"), r"\1[REDACTED]\2"),
     # "Processing vocal history record: {…'transcriptText': 'turn off the lights',
     # 'personFirstName': 'Stefan'…}" — what a household said to Alexa, and who
-    # said it. AlexaService._skip_unused_history_fetch() stops the library
-    # fetching this at all, so normally nothing here matches; this is the backstop
-    # for a library bump that renames the method that patch hooks, because these
-    # reports are something we ask users to send us.
+    # said it. Since aioamazondevices 15.1.3 (upstream PR #1045) the library
+    # skips the fetch entirely unless something subscribes to on_history_event,
+    # and nothing here does, so normally nothing matches; this is the backstop
+    # for the day that changes, because these reports are something we ask users
+    # to send us.
     (re.compile(r"(Processing vocal history record:).*", re.DOTALL), r"\1 [REDACTED]"),
 )
 

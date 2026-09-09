@@ -15,6 +15,7 @@ import socket
 import ssl
 import time
 from http import HTTPMethod
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 from xml.sax.saxutils import escape as escape_xml
 
@@ -43,12 +44,24 @@ from aioamazondevices.structures import (
     AmazonListEventType,
     AmazonListItemStatus,
     AmazonMediaControls,
+    AmazonSaveDataConfig,
+    AmazonSequenceType,
 )
 
 from .connection import unresolved_host_message
 from .constants import DEVICES, VOICES
 
 VOLUME_DIVISOR = 100
+
+# Where the library is allowed to keep its own state files. It writes exactly
+# one — settings.json, holding the "default device" serial that
+# set_default_device() persists, which this app never calls — so nothing lands
+# here today; the same path is handed to our _save_to_file callback for every
+# raw response. Required since aioamazondevices 15.0.0 (AmazonSaveDataConfig).
+# /userdata is the writable mount Homey keeps across app updates, so an upstream
+# version that does start writing puts it somewhere sane rather than somewhere
+# read-only.
+SAVE_DATA_DIR = Path("/userdata")
 
 SINGLE_FAMILIES = {"ECHO", "KNIGHT", "ROOK"}
 GROUP_FAMILY = "WHA"
@@ -146,7 +159,7 @@ def _allow_dnd_push_events() -> None:
     Idempotent, and only ever *adds* an accepted type. If a library bump renames
     or inlines the predicate this becomes a no-op and DND simply falls back to
     the sync_dnd() heartbeat poll, which is kept for exactly that reason.
-    Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+    Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
 
     DELETE ME once https://github.com/chemelli74/aioamazondevices/pull/1010
     ships — it adds AmazonPushMessage.DoNotDisturbChange (same event value) plus
@@ -462,7 +475,7 @@ class AlexaService:
         # is the very failure someone pins a server to escape, so the setting
         # would be useless to anyone not already signed in. The pin is applied
         # immediately afterwards by _apply_pinned_site().
-        # Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        # Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
         original = login._domain_refresh_auth_cookies
 
         async def keep_default_domain() -> None:
@@ -509,12 +522,13 @@ class AlexaService:
             login_email=email,
             login_password=password,
             login_data=login_data,
-            save_to_file=self._save_to_file,
+            save_data=AmazonSaveDataConfig(
+                path=SAVE_DATA_DIR, callback=self._save_to_file
+            ),
         )
         self._skip_known_customer_id_lookup()
         _allow_dnd_push_events()
         self._intercept_dnd_push_events()
-        self._skip_unused_history_fetch()
 
     def _intercept_dnd_push_events(self) -> None:
         """Handle PUSH_DND_STATE_CHANGE ourselves, delegate everything else.
@@ -677,47 +691,6 @@ class AlexaService:
             name = self._cached_list_name(list_id)
         return name or list_id
 
-    def _skip_unused_history_fetch(self) -> None:
-        """Stop the library fetching voice history nothing in this app reads.
-
-        The library treats an EqualizerStateChange push as a proxy for "somebody
-        spoke" and calls _handle_eq_event_as_history_proxy(), which sleeps 2s,
-        refreshes the CSRF and access tokens, and pulls *seven days* of voice
-        history from alexa.amazon.<tld>. Only then does _emit_history_event()
-        check whether anything subscribed — and nothing here does, so every byte
-        of it is discarded. The gate is one line too late; see the upstream note.
-
-        Three reasons that is worth suppressing rather than tolerating:
-
-        - It is an unaccounted source of lookups of alexa.amazon.<tld>, the exact
-          name that fails on the networks in the support thread, fired whenever
-          anyone in the house talks to an Echo. We count lookups carefully on the
-          login and heartbeat paths (see DNS_CACHE_TTL_S) and this bypassed all
-          of that.
-        - http2.py awaits the push handler inline in the directive stream loop,
-          so each one stalls volume/media/DND updates for the 2s sleep plus two
-          round trips.
-        - Every record is logged at DEBUG including transcriptText, personId and
-          personFirstName. With diagnostic logging on that lands in the app log
-          and therefore in the diagnostic reports we ask users to send us, so a
-          support report could carry what someone's household said to Alexa.
-
-        Replacing the bound method on the api instance rather than widening the
-        event filter keeps this independent of the DND patches above, which have
-        their own (different) upstream fix pending.
-
-        DELETE ME once upstream gates the fetch on `on_history_event.frozen`, or
-        sooner if this app ever consumes voice history — with that fix in place,
-        subscribing is all it takes to turn the fetch back on.
-        """
-        if not hasattr(self._api, "_handle_eq_event_as_history_proxy"):
-            return
-
-        async def skip() -> None:
-            return None
-
-        self._api._handle_eq_event_as_history_proxy = skip
-
     async def _handle_dnd_push(self, payload: dict[str, Any]) -> None:
         serial = (payload.get("dopplerId") or {}).get("deviceSerialNumber")
         enabled = payload.get("enabled")
@@ -736,12 +709,12 @@ class AlexaService:
         stopped returning that entry (the same bug _seed_customer_id_from_*
         works around) it never does, so it re-fetches the whole device list
         CUSTOMER_ACCOUNT_MAX_RETRIES times before falling through — 30 as of
-        aioamazondevices 14.2.2, up from 3 in 14.1.9. By then the id is long
-        since in hand, so skip the lookup entirely.
+        aioamazondevices 14.2.2 and still 30 in 15.1.3, up from 3 in 14.1.9. By
+        then the id is long since in hand, so skip the lookup entirely.
 
         Only ever skips work: with no id known the library's own logic runs
         untouched, so accounts that aren't affected behave exactly as upstream.
-        Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
         """
         login = self._api.login
         obtain_account_customer_id = login.obtain_account_customer_id
@@ -864,7 +837,7 @@ class AlexaService:
 
         Mirrors aioamazondevices' private AmazonLogin._refresh_auth_cookies (no
         public equivalent), but guards on the refresh result before clearing the
-        jar. Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        jar. Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
 
         The cookie-unpacking loop below is adapted from aioamazondevices
         (https://github.com/chemelli74/aioamazondevices), Copyright the
@@ -907,7 +880,7 @@ class AlexaService:
         One line per transition is enough to see that in a diagnostic report
         (present at login, cleared at the renewal, and either re-acquired on the
         next heartbeat or not) without writing a line every five minutes forever.
-        Reads a private attribute; pinned to aioamazondevices==14.2.2.
+        Reads a private attribute; pinned to aioamazondevices==15.1.3.
         """
         if self._api is None:
             return
@@ -1020,7 +993,7 @@ class AlexaService:
         with no I/O, so applying the other marketplace and putting the current
         one back is the cheapest way to ask "what locale does amazon.fr mean?"
         without duplicating the library's langcodes handling.
-        Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
         """
         if self._api is None:
             return None
@@ -1061,7 +1034,7 @@ class AlexaService:
         switch of `AmazonLogin._domain_refresh_auth_cookies()` — calling that
         directly would re-mint cookies on *every* connect, because its switch
         branch fires for any non-default domain. Pinned to
-        aioamazondevices==14.2.2 — re-check on library bumps.
+        aioamazondevices==15.1.3 — re-check on library bumps.
         """
         if self._api is None:
             return
@@ -1086,7 +1059,7 @@ class AlexaService:
         new host into stored `login_data` so the next start begins there.
         Mirrors the switch in `AmazonLogin._domain_refresh_auth_cookies()` rather
         than calling it, because that one re-mints cookies on *every* connect for
-        any non-default domain. Pinned to aioamazondevices==14.2.2.
+        any non-default domain. Pinned to aioamazondevices==15.1.3.
 
         `locale_site` keeps the spoken locale on a *different* marketplace than
         the traffic — see _apply_pinned_site. Omit it and the locale follows the
@@ -1194,11 +1167,21 @@ class AlexaService:
                 await self._set_state("connected")
 
     # --- persistence (library pushes refreshed login_data here) ----------
-    async def _save_to_file(self, raw_data, url: str = "login_data", content_type: str = "application/json") -> None:
+    async def _save_to_file(
+        self,
+        path,
+        raw_data,
+        url: str = "login_data",
+        content_type: str = "application/json",
+    ) -> None:
+        # `path` is the AmazonSaveDataConfig directory (SAVE_DATA_DIR) and is
+        # deliberately unused: this app keeps nothing on disk, login_data goes to
+        # Homey's settings store through on_login_data. The callback grew that
+        # leading argument in aioamazondevices 15.0.0.
         if isinstance(raw_data, dict) and url == "login_data" and self.on_login_data is not None:
             await self.on_login_data(raw_data)
             return
-        # WORKAROUND (aioamazondevices==14.2.2): seed the account customer id from
+        # WORKAROUND (aioamazondevices==15.1.3): seed the account customer id from
         # responses passing through here so the library's obtain_account_customer_id()
         # can't fail. It derives the id by scanning the device list for the *just-
         # registered* virtual device's serial, but Amazon stops returning that entry
@@ -1374,7 +1357,53 @@ class AlexaService:
         """
         await self._api._device_handler.get_base_devices()
         self._devices = self._api._device_handler.devices
+        self._seed_default_device()
         return self._devices
+
+    def _seed_default_device(self) -> None:
+        """Give the library a device to fall back on for routines.
+
+        `call_routine()` posts from `devices[self._api._default_device_serial]`,
+        and that serial is only ever filled in by the library's own
+        `_init_default_device()`, which runs inside `get_devices_data()` — the
+        very call refresh_devices() avoids (see its docstring). Unseeded it is
+        the empty string, so the fallback would die on `KeyError: ''`. Up to
+        14.2.2 `default_device` was a lazy property that fell back to the first
+        online device; 15.1.0 turned it into persisted state and moved that
+        fallback out of our path, so do it here.
+
+        Only a fallback: run_routine() posts from the device the flow card names,
+        because the device decides where a "reply on the device you speak to"
+        step lands (see its docstring). This is what happens when the card's
+        device is no longer in the session's list.
+
+        Skips speaker groups and stereo pairs deliberately: `call_routine()`
+        posts once per cluster member, so a routine falling back onto a group
+        would run twice, and a `WHA` serial is not accepted by the sequence
+        endpoint at all (see "Speaker groups are a media target only" in
+        AGENTS.md). The library's own fallback takes the first online device of
+        any kind and would happily land on one.
+
+        We never call set_default_device(), so there is no persisted choice to
+        respect: first online single device is the whole policy.
+        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
+        """
+        if self._api is None or not hasattr(self._api, "_default_device_serial"):
+            return
+        if self._api._default_device_serial in self._devices:
+            return
+        online = [d for d in self._devices.values() if d.online]
+        # A group-only account gets a group anyway: better to let the routine
+        # fail on Amazon's answer than on a KeyError with no explanation.
+        chosen = next(
+            (d for d in online if len(d.device_cluster_members) <= 1),
+            online[0] if online else None,
+        )
+        if chosen is None:
+            self._log("routine fallback device: none (no device is online)")
+            return
+        self._api._default_device_serial = chosen.serial_number
+        self._log(f"routine fallback device: {chosen.account_name} ({chosen.serial_number})")
 
     async def sync_dnd(self) -> None:
         """Poll Do Not Disturb state for every device and publish it.
@@ -1387,7 +1416,7 @@ class AlexaService:
         Uses the library's private handler on purpose: the public
         get_devices_data() would also pull notifications/comms/sensor data,
         which refresh_devices() deliberately avoids (see its docstring).
-        Pinned to aioamazondevices==14.2.2 — re-check on library bumps.
+        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
 
         Best-effort: a failure here must never break login or the heartbeat.
         """
@@ -1531,20 +1560,56 @@ class AlexaService:
         await self._api.call_alexa_sound(self._device(serial), sound_id)
 
     @heal_stale_session
-    async def run_routine(self, routine_name: str) -> None:
+    async def run_routine(self, routine_name: str, serial: Optional[str] = None) -> None:
+        """Run a routine, from `serial` when the flow card named a device.
+
+        A routine *is* device specific, whatever the library's own comment on
+        call_routine() says. Amazon stores the sequence with the placeholders
+        `ALEXA_CURRENT_DSN` / `ALEXA_CURRENT_DEVICE_TYPE` wherever a step was
+        configured for "the Alexa device you speak to", and
+        `utils.replace_routine_placeholders()` substitutes whichever device the
+        sequence is posted from. So a routine whose reply is spoken on the
+        device you talked to answers on *that* device — and `call_routine()`
+        hardcodes the library's default device, which would be an Echo the user
+        never picked. The `run-routine` card carries a device argument (Homey
+        injects one into every card in a driver's flow compose file), so pass it
+        through and post the sequence from there.
+
+        Posts to the one device rather than through
+        `_call_alexa_command_per_cluster_member()`, which call_routine() uses:
+        that loops over cluster members, so picking a stereo-paired Echo would
+        run the whole routine twice. Routines with no placeholders are
+        unaffected either way — the payload is the routine's own sequence.
+
+        Falls back to `call_routine()` when no serial is given or the device is
+        unknown to this session (see _seed_default_device for what that picks).
+        Uses the library's private sequence handler — the only single-device
+        entry point for a routine. Pinned to aioamazondevices==15.1.3 — re-check
+        on library bumps.
+        """
         if self._api is None:
             raise RuntimeError("Not connected to Amazon")
-        # call_routine looks routines up by name in a cache only populated by the
-        # autocomplete; refresh it (list_routines does) so the flow works even
-        # after an app restart.
+        # The routine cache is only populated by the autocomplete; refresh it
+        # (list_routines does) so the flow works even after an app restart.
         names = await self.list_routines()
         if routine_name not in names:
-            # call_routine would raise a bare KeyError on the name — say why.
+            # Both paths raise a bare KeyError on the name — say why.
             self._log(
                 f"run routine: '{routine_name}' is not among the {len(names)} routine(s) "
                 "Amazon returned for this account"
             )
-        await self._api.call_routine(routine_name)
+        device = self._devices.get(serial) if serial else None
+        if device is None:
+            if serial:
+                self._log(
+                    f"run routine: device {serial} is not in this session's device list; "
+                    "posting from the account's default device instead"
+                )
+            await self._api.call_routine(routine_name)
+            return
+        await self._api._sequence_handler.send_message(
+            device, AmazonSequenceType.Routines, routine_name
+        )
 
     @heal_stale_session
     async def set_volume(self, serial: str, value: float) -> None:
