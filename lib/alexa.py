@@ -27,17 +27,14 @@ from yarl import URL
 from aioamazondevices.api import AmazonEchoApi
 from aioamazondevices.exceptions import CannotAuthenticate
 from aioamazondevices.const.http import (
-    AMAZON_DEVICE_TYPE,
     ARRAY_WRAPPER,
     DEFAULT_SITE,
     REFRESH_ACCESS_TOKEN,
     REFRESH_AUTH_COOKIES,
     URI_BEHAVIORS_AUTOMATIONS,
     URI_DEVICES,
-    URI_REGISTER,
 )
 from aioamazondevices.const.sounds import SOUNDS_LIST
-from aioamazondevices.implementation import http2 as amazon_http2
 from aioamazondevices.structures import (
     AmazonDevice,
     AmazonListEvent,
@@ -69,11 +66,6 @@ GROUP_FAMILY = "WHA"
 # Per-device settings (screen power, brightness, …). Not exposed by
 # aioamazondevices; keyed on deviceAccountId, not the serial number.
 URI_DEVICE_SETTINGS = "api/v1/devices/{account_id}/settings/{name}"
-
-# Amazon *does* push Do Not Disturb changes over the HTTP/2 channel, but
-# aioamazondevices doesn't know the message type yet and drops it as unknown
-# before any subscriber sees it. See _allow_dnd_push_events.
-PUSH_DND_STATE_CHANGE = "PUSH_DND_STATE_CHANGE"
 
 # Soft-recovery throttle. A genuine auth failure (CannotAuthenticate) makes the
 # library refresh the access token and *still* get rejected, so an unbounded
@@ -128,7 +120,9 @@ OTP_PAGE_MISSING = "MFA OTP code not found on login page"
 #                              deviceOwnerCustomerId
 # Only the directed id works in a behaviours payload. Post a sequence with the
 # obfuscated one and Amazon answers 400 Bad Request, so login looks perfect and
-# then nothing ever speaks. See _seed_customer_id_from_register.
+# then nothing ever speaks. Since aioamazondevices 16.0.0 the library reads the
+# directed id from /api/users/me and keeps it in login_data; the check stays for
+# _log_account_context, which must not compare against the wrong form.
 OBFUSCATED_CUSTOMER_ID_PREFIX = "amzn1.account."
 
 # The library reads Amazon's post-login redirect with a raw dict lookup
@@ -143,40 +137,6 @@ _PLAYBACK = {
     "next": AmazonMediaControls.Next,
     "previous": AmazonMediaControls.Previous,
 }
-
-
-def _allow_dnd_push_events() -> None:
-    """Stop aioamazondevices discarding Amazon's DND push messages.
-
-    Amazon pushes `PUSH_DND_STATE_CHANGE` over the AVS directive stream when a
-    device's Do Not Disturb flips — from the Alexa app, by voice, or from a
-    routine. The library filters every message whose type isn't in its
-    AmazonPushMessage enum, logging "Unknown HTTP2 push message", so the event
-    is dropped inside _process_rendering_update before any subscriber runs.
-    Widening that predicate is the whole fix; the payload shape is already what
-    the rest of the pipeline expects.
-
-    Idempotent, and only ever *adds* an accepted type. If a library bump renames
-    or inlines the predicate this becomes a no-op and DND simply falls back to
-    the sync_dnd() heartbeat poll, which is kept for exactly that reason.
-    Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
-
-    DELETE ME once https://github.com/chemelli74/aioamazondevices/pull/1010
-    ships — it adds AmazonPushMessage.DoNotDisturbChange (same event value) plus
-    an on_dnd_event Signal to subscribe to instead. See "Pending upstream" in
-    AGENTS.md for the swap.
-    """
-    is_known_event_type = getattr(amazon_http2, "_is_known_event_type", None)
-    if is_known_event_type is None or getattr(is_known_event_type, "_dnd_allowed", False):
-        return
-
-    def patched(push_event_type: str) -> bool:
-        return push_event_type == PUSH_DND_STATE_CHANGE or is_known_event_type(
-            push_event_type
-        )
-
-    patched._dnd_allowed = True
-    amazon_http2._is_known_event_type = patched
 
 
 def is_directed_customer_id(value: Optional[str]) -> bool:
@@ -419,9 +379,8 @@ class AlexaService:
             await self._set_state("connecting")
             # Phase timings help explain a slow sign-in in diagnostic reports:
             # Amazon's OAuth flow bakes in per-request 0/2/5s back-offs when it
-            # throttles the Homey's IP. (The library's own account-id lookup no
-            # longer contributes — registration seeds the id, so the guard in
-            # _skip_known_customer_id_lookup skips it.)
+            # throttles the Homey's IP. (The library's account-id lookup is a
+            # single GET /api/users/me since aioamazondevices 16.0.0.)
             t0 = time.monotonic()
             try:
                 self._log("login: submitting credentials + OTP to Amazon …")
@@ -475,7 +434,7 @@ class AlexaService:
         # is the very failure someone pins a server to escape, so the setting
         # would be useless to anyone not already signed in. The pin is applied
         # immediately afterwards by _apply_pinned_site().
-        # Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
+        # Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
         original = login._domain_refresh_auth_cookies
 
         async def keep_default_domain() -> None:
@@ -526,31 +485,6 @@ class AlexaService:
                 path=SAVE_DATA_DIR, callback=self._save_to_file
             ),
         )
-        self._skip_known_customer_id_lookup()
-        _allow_dnd_push_events()
-        self._intercept_dnd_push_events()
-
-    def _intercept_dnd_push_events(self) -> None:
-        """Handle PUSH_DND_STATE_CHANGE ourselves, delegate everything else.
-
-        The library's own handler is the sole subscriber to the push signal and
-        is attached inside start_http2_processing(), so replacing it on the api
-        instance here — before the channel opens — is what gets it subscribed.
-        Paired with _allow_dnd_push_events(); without that the message never
-        arrives and this simply never fires.
-
-        DELETE ME together with _allow_dnd_push_events() once upstream PR #1010
-        ships — see "Pending upstream" in AGENTS.md.
-        """
-        push_event_handler = self._api._http2_push_event_handler
-
-        async def handler(event_type: str, payload: dict[str, Any]) -> None:
-            if event_type == PUSH_DND_STATE_CHANGE:
-                await self._handle_dnd_push(payload)
-                return
-            await push_event_handler(event_type, payload)
-
-        self._api._http2_push_event_handler = handler
 
     async def _handle_todo_event(self, event: AmazonListEvent) -> None:
         """Turn an item-added list event into the app's trigger.
@@ -691,49 +625,6 @@ class AlexaService:
             name = self._cached_list_name(list_id)
         return name or list_id
 
-    async def _handle_dnd_push(self, payload: dict[str, Any]) -> None:
-        serial = (payload.get("dopplerId") or {}).get("deviceSerialNumber")
-        enabled = payload.get("enabled")
-        if serial is None or enabled is None or self.on_dnd is None:
-            self._log(f"ignoring malformed DND push payload: {payload}")
-            return
-        await self.on_dnd({serial: bool(enabled)})
-
-    def _skip_known_customer_id_lookup(self) -> None:
-        """Don't re-derive the account customer id once we already have it.
-
-        obtain_account_customer_id() runs on *every* login — including the
-        stored-data login the heartbeat performs every few minutes — and its
-        loop has no early exit: it only returns once it spots the *just-
-        registered* virtual device in the device list. On accounts where Amazon
-        stopped returning that entry (the same bug _seed_customer_id_from_*
-        works around) it never does, so it re-fetches the whole device list
-        CUSTOMER_ACCOUNT_MAX_RETRIES times before falling through — 30 as of
-        aioamazondevices 14.2.2 and still 30 in 15.1.3, up from 3 in 14.1.9. By
-        then the id is long since in hand, so skip the lookup entirely.
-
-        Only ever skips work: with no id known the library's own logic runs
-        untouched, so accounts that aren't affected behave exactly as upstream.
-        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
-        """
-        login = self._api.login
-        obtain_account_customer_id = login.obtain_account_customer_id
-
-        async def guarded() -> None:
-            ss = self._api._session_state_data
-            if is_directed_customer_id(ss.account_customer_id):
-                return
-            # One plain device-list fetch is all it takes — the response passes
-            # through _save_to_file, which lifts the directed id off the
-            # account's own "This Device" entry. Only if that somehow comes up
-            # empty do we fall back to the library's 30-attempt loop.
-            await self._seed_customer_id_from_device_list()
-            if is_directed_customer_id(ss.account_customer_id):
-                return
-            await obtain_account_customer_id()
-
-        login.obtain_account_customer_id = guarded
-
     async def _after_login(self) -> None:
         await self.refresh_devices()
         self._log_account_context()
@@ -743,6 +634,8 @@ class AlexaService:
         self._api.on_media_state_event.freeze()
         self._api.on_todo_event.append(self._handle_todo_event)
         self._api.on_todo_event.freeze()
+        self._api.on_dnd_event.append(self._handle_dnd)
+        self._api.on_dnd_event.freeze()
         self._log("login: devices fetched; opening HTTP/2 push channel …")
         await self._start_push_channel()
         await self._set_state("connected")
@@ -837,7 +730,7 @@ class AlexaService:
 
         Mirrors aioamazondevices' private AmazonLogin._refresh_auth_cookies (no
         public equivalent), but guards on the refresh result before clearing the
-        jar. Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
+        jar. Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
 
         The cookie-unpacking loop below is adapted from aioamazondevices
         (https://github.com/chemelli74/aioamazondevices), Copyright the
@@ -880,7 +773,7 @@ class AlexaService:
         One line per transition is enough to see that in a diagnostic report
         (present at login, cleared at the renewal, and either re-acquired on the
         next heartbeat or not) without writing a line every five minutes forever.
-        Reads a private attribute; pinned to aioamazondevices==15.1.3.
+        Reads a private attribute; pinned to aioamazondevices==16.3.0.
         """
         if self._api is None:
             return
@@ -993,7 +886,7 @@ class AlexaService:
         with no I/O, so applying the other marketplace and putting the current
         one back is the cheapest way to ask "what locale does amazon.fr mean?"
         without duplicating the library's langcodes handling.
-        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
+        Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
         """
         if self._api is None:
             return None
@@ -1034,7 +927,7 @@ class AlexaService:
         switch of `AmazonLogin._domain_refresh_auth_cookies()` — calling that
         directly would re-mint cookies on *every* connect, because its switch
         branch fires for any non-default domain. Pinned to
-        aioamazondevices==15.1.3 — re-check on library bumps.
+        aioamazondevices==16.3.0 — re-check on library bumps.
         """
         if self._api is None:
             return
@@ -1059,7 +952,7 @@ class AlexaService:
         new host into stored `login_data` so the next start begins there.
         Mirrors the switch in `AmazonLogin._domain_refresh_auth_cookies()` rather
         than calling it, because that one re-mints cookies on *every* connect for
-        any non-default domain. Pinned to aioamazondevices==15.1.3.
+        any non-default domain. Pinned to aioamazondevices==16.3.0.
 
         `locale_site` keeps the spoken locale on a *different* marketplace than
         the traffic — see _apply_pinned_site. Omit it and the locale follows the
@@ -1181,28 +1074,8 @@ class AlexaService:
         if isinstance(raw_data, dict) and url == "login_data" and self.on_login_data is not None:
             await self.on_login_data(raw_data)
             return
-        # WORKAROUND (aioamazondevices==15.1.3): seed the account customer id from
-        # responses passing through here so the library's obtain_account_customer_id()
-        # can't fail. It derives the id by scanning the device list for the *just-
-        # registered* virtual device's serial, but Amazon stops returning that entry
-        # once an account has accumulated many app registrations — so login dies with
-        # "Cannot find account owner customer ID" even though registration succeeded.
-        # Both the registration response (customer_id) and the device list (the
-        # account's own "This Device", deviceType AMAZON_DEVICE_TYPE, carries the same
-        # deviceOwnerCustomerId) hold the value; grab it from whichever arrives first.
-        # Covers interactive login (register) and stored/reconnect login (device list).
-        if not isinstance(raw_data, str) or self._api is None:
-            return
-        needs_customer_id = not is_directed_customer_id(
-            self._api._session_state_data.account_customer_id
-        )
-        if URI_REGISTER in url:
-            if needs_customer_id:
-                self._seed_customer_id_from_register(raw_data)
-        elif URI_DEVICES in url:
+        if isinstance(raw_data, str) and URI_DEVICES in url:
             self._harvest_device_account_ids(raw_data)
-            if needs_customer_id:
-                self._seed_customer_id_from_devices(raw_data)
 
     def _harvest_device_account_ids(self, body: str) -> None:
         """Keep the `deviceAccountId` aioamazondevices drops from AmazonDevice.
@@ -1224,124 +1097,6 @@ class AlexaService:
         if found and not self._device_account_ids:
             self._log(f"device settings available for {len(found)} device(s)")
         self._device_account_ids.update(found)
-
-    async def _seed_customer_id_from_device_list(self) -> None:
-        """Fetch the device list once purely to learn the directed customer id.
-
-        Cheaper and more predictable than the library's own lookup, which polls
-        the same endpoint up to 30 times waiting for the *just-registered*
-        virtual device to show up — something Amazon stops doing once an account
-        has collected a pile of app registrations.
-        """
-        if self._api is None:
-            return
-        try:
-            await self._api._http_wrapper.session_request(
-                method=HTTPMethod.GET,
-                url=URL.joinpath(
-                    self._api._session_state_data.alexa_website_url, URI_DEVICES
-                ),
-            )
-        except Exception as e:  # noqa: BLE001 - the library's lookup still follows
-            self._log(f"customer id lookup via device list failed: {type(e).__name__}: {e}")
-
-    def _seed_customer_id_from_register(self, body: str) -> None:
-        try:
-            customer_id = json.loads(body)["response"]["success"]["customer_id"]
-        except (json.JSONDecodeError, KeyError, TypeError):
-            return
-        if not customer_id:
-            return
-        if not is_directed_customer_id(customer_id):
-            # Registration returns the obfuscated form, which every sequence
-            # POST rejects with 400 — leave the id unset so the device list can
-            # supply the directed one.
-            self._log("login: registration returned an obfuscated customer id — ignoring it")
-            return
-        self._api._session_state_data.account_customer_id = customer_id
-        self._log("login: seeded account customer id from registration")
-
-    def _own_registration_serial(self) -> Optional[str]:
-        """The serial this app install was registered under, if we know it yet."""
-        try:
-            return self._api._session_state_data.login_stored_data["device_info"][
-                "device_serial_number"
-            ]
-        except (AttributeError, KeyError, TypeError):
-            return None
-
-    def _apply_seeded_customer_id(self, device: dict, how: str) -> None:
-        self._api._session_state_data.account_customer_id = device[
-            "deviceOwnerCustomerId"
-        ]
-        self._log(f"login: recovered account customer id from device list ({how})")
-
-    def _seed_customer_id_from_devices(self, body: str) -> None:
-        """Learn the directed customer id from the raw device-list response.
-
-        Amazon returns one virtual AMAZON_DEVICE_TYPE entry *per account*, with
-        that account's individual app installs nested in its `appDeviceList`. In
-        an Amazon Household the list therefore carries one such entry per adult,
-        so taking the first one can hand us a perfectly valid *directed* id that
-        belongs to somebody else: is_directed_customer_id() passes, every real
-        Echo then compares as foreign, and every Speak/Announce comes back 400
-        while reads keep working (report c68e4ea4).
-
-        So match on our own registration serial, the way the library's
-        obtain_account_customer_id() does, and fall back to the first entry only
-        when that can't be done. On a single-account setup both paths pick the
-        same id, so nothing changes for the accounts this workaround was written
-        for in the first place.
-        """
-        try:
-            devices = json.loads(body).get("devices", [])
-        except (json.JSONDecodeError, AttributeError):
-            return
-
-        candidates = [
-            device
-            for device in devices
-            if device
-            and device.get("deviceType") == AMAZON_DEVICE_TYPE
-            and device.get("deviceOwnerCustomerId")
-        ]
-        if not candidates:
-            return
-
-        # How many accounts are in play, logged either way. A report showing a
-        # sound match *and* devices owned by nobody we know is a real Household
-        # sharing; one showing a guess is our own bug. Without this the two are
-        # indistinguishable in a log (report f6a1b2a6).
-        if len(candidates) > 1:
-            accounts = {device["deviceOwnerCustomerId"] for device in candidates}
-            self._log(
-                f"login: device list carries {len(candidates)} app registrations "
-                f"across {len(accounts)} account(s)"
-            )
-
-        own_serial = self._own_registration_serial()
-        if own_serial:
-            for device in candidates:
-                if any(
-                    isinstance(sub, dict)
-                    and sub.get("serialNumber") == own_serial
-                    for sub in device.get("appDeviceList") or []
-                ):
-                    self._apply_seeded_customer_id(
-                        device, "matched on this app's own registration"
-                    )
-                    return
-
-        # Either Amazon stopped listing our registration — the very bug this
-        # seeding works around — or we never learned our serial. The first entry
-        # is the best guess left, and it is what every version so far has used.
-        if len(candidates) > 1:
-            self._log(
-                "login: none of them carries this app's serial — guessing the first; "
-                "if that is another Household member's account, every sequence will "
-                "come back 400 while reads keep working"
-            )
-        self._apply_seeded_customer_id(candidates[0], "first app registration listed")
 
     # --- data ------------------------------------------------------------
     async def refresh_devices(self) -> dict[str, AmazonDevice]:
@@ -1386,7 +1141,7 @@ class AlexaService:
 
         We never call set_default_device(), so there is no persisted choice to
         respect: first online single device is the whole policy.
-        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
+        Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
         """
         if self._api is None or not hasattr(self._api, "_default_device_serial"):
             return
@@ -1408,23 +1163,18 @@ class AlexaService:
     async def sync_dnd(self) -> None:
         """Poll Do Not Disturb state for every device and publish it.
 
-        Live changes arrive on the push channel (see _allow_dnd_push_events), so
-        this is the safety net: it seeds the state at connect and re-syncs on the
-        heartbeat, covering a dropped push channel or a library bump that lands
-        the push patch on the floor. One GET covers the whole account.
-
-        Uses the library's private handler on purpose: the public
-        get_devices_data() would also pull notifications/comms/sensor data,
-        which refresh_devices() deliberately avoids (see its docstring).
-        Pinned to aioamazondevices==15.1.3 — re-check on library bumps.
+        Live changes arrive on the push channel (the library's on_dnd_event,
+        see _handle_dnd), so this is the safety net: it seeds the state at
+        connect and re-syncs on the heartbeat, covering a dropped push channel.
+        One GET covers the whole account; the result reaches us through the
+        same on_dnd_event signal as a push.
 
         Best-effort: a failure here must never break login or the heartbeat.
         """
         if self._api is None or self.on_dnd is None:
             return
         try:
-            sensors = await self._api._dnd_handler.get_do_not_disturb_status()
-            await self.on_dnd({serial: bool(s.value) for serial, s in sensors.items()})
+            await self._api.sync_dnd_state()
         except Exception as e:  # noqa: BLE001
             self._log(f"DND sync failed: {type(e).__name__}: {e}")
 
@@ -1460,6 +1210,13 @@ class AlexaService:
             return
         for serial, media in payload.items():
             await self.on_media(serial, media)
+
+    async def _handle_dnd(self, payload: dict[str, bool]) -> None:
+        # The library sends its whole cached {serial: enabled} map on every
+        # change, not just the device that flipped; apply_dnd() ignores repeats.
+        if self.on_dnd is None:
+            return
+        await self.on_dnd(payload)
 
     async def _handle_reauth(self) -> None:
         # The library calls this from *inside* the push task, right before that
@@ -1584,7 +1341,7 @@ class AlexaService:
         Falls back to `call_routine()` when no serial is given or the device is
         unknown to this session (see _seed_default_device for what that picks).
         Uses the library's private sequence handler — the only single-device
-        entry point for a routine. Pinned to aioamazondevices==15.1.3 — re-check
+        entry point for a routine. Pinned to aioamazondevices==16.3.0 — re-check
         on library bumps.
         """
         if self._api is None:

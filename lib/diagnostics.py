@@ -1,8 +1,7 @@
 """Opt-in diagnostic logging.
 
 `aioamazondevices` logs a lot of useful detail at DEBUG (login step-by-step, the
-device list it fetches, domain/region switches, the customer-id lookup that fails
-with "Cannot find account owner customer ID"), but those records go to a plain
+device list it fetches, domain/region switches, the customer-id lookup), but those records go to a plain
 Python logger that nothing in the Homey sandbox captures — so they never reach a
 user's diagnostic report. This bridges that logger into Homey's app log so the
 detail shows up in a report.
@@ -12,9 +11,9 @@ short-lived secrets at DEBUG (the bearer access token inside request headers, th
 CSRF cookie value). We redact those here before anything leaves the app; the
 library already scrubs its structured JSON dumps (see utils.scrub_fields).
 
-Pinned to aioamazondevices==15.1.3 — re-check the redaction patterns on library
+Pinned to aioamazondevices==16.3.0 — re-check the redaction patterns on library
 bumps against the sensitive DEBUG lines in http_wrapper.session_request / login.
-As of 15.1.3 the library's own scrub list covers `Authorization`,
+As of 16.3.0 the library's own scrub list covers `Authorization`,
 `anti-csrftoken-a2z` and `secureSessionToken`, so the header patterns below are
 backstops; the raw `CSRF cookie value: <…>` line is still logged unscrubbed.
 """
@@ -43,6 +42,11 @@ _REDACTIONS = (
     # for the day that changes, because these reports are something we ask users
     # to send us.
     (re.compile(r"(Processing vocal history record:).*", re.DOTALL), r"\1 [REDACTED]"),
+    # "JSON 'users/me' data: {'id': 'A146…', 'fullName': 'Stefan …', …}" — the
+    # customer-id lookup added in aioamazondevices 16.0.0. scrub_fields masks
+    # neither key and only obfuscates the email. Logged once per install (the
+    # id is kept in login_data afterwards), and nothing in it is diagnostic.
+    (re.compile(r"(JSON 'users/me' data:).*", re.DOTALL), r"\1 [REDACTED]"),
 )
 
 
