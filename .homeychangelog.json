@@ -106,5 +106,8 @@
   },
   "2.2.4": {
     "en": "Fixes the Run Routine flow card running the routine from the wrong speaker. It now runs from the Echo selected on the card, so a routine with a step set to answer on the device you spoke to answers there instead of on an arbitrary Echo. A speaker group's volume now follows its members: change one speaker and the group shows their average. Also updates the Amazon library the app talks through."
+  },
+  "2.2.5": {
+    "en": "Updates the Amazon library the app talks through. Do Not Disturb changes made in the Alexa app, by voice or by a routine now reach Homey through Amazon's own update instead of a workaround. Your account is now identified with a single request to Amazon instead of being worked out from your device list. Diagnostic reports now hide your name from that request."
   }
 }
