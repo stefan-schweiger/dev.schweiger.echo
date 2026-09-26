@@ -11,7 +11,7 @@ A Homey app (**Python** Apps SDK v3, runs on Homey's CPython 3.14 runtime) that 
 ## Tech stack
 
 - **Language/runtime:** Python (Homey runs CPython **3.14**); `"runtime": "python"`, `"pythonVersion": "3.14"` in the manifest.
-- **Core dependency:** `aioamazondevices==15.1.3` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
+- **Core dependency:** `aioamazondevices==16.3.0` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
 - **Platform:** Homey Apps SDK v3. **Requires Homey firmware >= 13.0.0** (Python apps).
 - **No test framework.** Validate with `homey app run` against a real Homey + Amazon account.
 - Type-checking (optional, local): `homey-stubs` + pyright.
@@ -121,18 +121,17 @@ as used by the `com.amazon.alexa` Homey app.
 (`App._refresh_screen_state`) and on each heartbeat. Non-screen devices cost nothing.
 
 **Do Not Disturb is pushed *and* polled.** Amazon sends `PUSH_DND_STATE_CHANGE` over the
-AVS stream whenever a device's DND flips (Alexa app, voice, or routine), but
-`aioamazondevices` doesn't know that message type and drops it as *"Unknown HTTP2 push
-message"* inside `_process_rendering_update`, before any subscriber runs.
-`_allow_dnd_push_events()` widens the library's `_is_known_event_type` predicate, and
-`_intercept_dnd_push_events()` replaces the api's push handler so DND events branch off to
-`_handle_dnd_push` (payload: `dopplerId.deviceSerialNumber` + `enabled`) and everything else
-delegates untouched. Worth upstreaming — it's one enum member plus a handler.
+AVS stream whenever a device's DND flips (Alexa app, voice, or routine). Since
+`aioamazondevices` 16.0.0 (upstream PR #1010) the library handles it and emits its whole
+cached `{serial: enabled}` map on `on_dnd_event`, which `_after_login` subscribes to
+(`_handle_dnd`). Up to 15.1.3 the message was dropped as *"Unknown HTTP2 push message"* and
+the app monkey-patched the library's push predicate and handler to get at it.
 
-`sync_dnd()` (one `GET api/dnd/device-status-list`, whole account per request) stays as the
-safety net: it seeds state at connect and re-syncs each heartbeat, so a dropped push channel
-or a library bump that lands the patch on the floor degrades to ≤5 min lag instead of
-breaking. Both paths converge on `App._on_dnd` → `EchoDevice.apply_dnd`.
+`sync_dnd()` → `api.sync_dnd_state()` (one `GET api/dnd/device-status-list`, whole account per
+request) stays as the safety net: it seeds state at connect and re-syncs each heartbeat, so a
+dropped push channel degrades to ≤5 min lag instead of breaking. Its result arrives through the
+same `on_dnd_event` signal, so both paths converge on `App._on_dnd` → `EchoDevice.apply_dnd`
+(which ignores repeats). The library leaves speaker groups and stereo pairs out of the map.
 
 ### Authentication & connection
 - **Sign-in (interactive):** `AmazonEchoApi(session, email, password)` → `api.login.login_mode_interactive(otp)` runs OAuth+PKCE + `POST /auth/register`, yielding a long-lived `refresh_token` (+ `macDms`, cookies). The whole `login_data` dict is stored in Homey settings under `login_data` (email under `email`). Authenticator-app TOTP is **required** (SMS/email codes don't work).
@@ -149,21 +148,19 @@ Amazon returns the account id in two shapes and they are not interchangeable:
 the **directed** form (`A146V8AS9QOCRT`) as `deviceOwnerCustomerId`. Every behaviours payload
 (Speak / Announce / Sound / routines) needs the *directed* one — post a sequence with the
 obfuscated id and Amazon answers **400 Bad Request**, so sign-in looks perfect and then nothing
-ever speaks. Guard with `is_directed_customer_id()` before treating an id as usable, and note
-that `AlexaService._log_account_context()`'s ownership counts are meaningless without it (an
-obfuscated id never matches any `deviceOwnerCustomerId`, so every device reads as somebody
-else's). Seeding therefore prefers the device list; `_seed_customer_id_from_device_list()` fetches
-it once explicitly rather than letting the library poll 30 times for the just-registered device.
+ever speaks. `AlexaService._log_account_context()` guards with `is_directed_customer_id()`,
+because its ownership counts are meaningless with the wrong form (an obfuscated id never matches
+any `deviceOwnerCustomerId`, so every device reads as somebody else's).
 
-**Which virtual device you read it off matters.** The list carries one `AMAZON_DEVICE_TYPE`
-(`A2IVLV5VM2W81`) entry *per account*, each with that account's app installs nested in its
-`appDeviceList`. On an Amazon Household there is one per adult, so taking the first hands you a
-valid *directed* id belonging to somebody else — `is_directed_customer_id()` passes, every Echo
-reads as foreign, and every sequence POST 400s while reads keep working (report `c68e4ea4`).
-`_seed_customer_id_from_devices()` therefore matches on this install's own
-`login_stored_data["device_info"]["device_serial_number"]`, as the library's
-`obtain_account_customer_id()` does, and only falls back to the first entry (logging a warning
-when there was more than one) if that fails. Single-account setups pick the same id either way.
+**Since `aioamazondevices` 16.0.0 the library gets this right itself.** `obtain_account_customer_id()`
+is one `GET api/users/me` and takes the directed id of the *signed-in* account from its `id`, so
+an Amazon Household no longer matters. The id is kept in `login_data["account_customer_id"]`,
+which the app persists on every heartbeat, and a stored login only looks it up when it is
+missing, i.e. once after upgrading from an older version. Up to 15.1.3 the library instead
+polled the device list up to 30 times for the just-registered virtual device (which Amazon stops
+listing on accounts with many app registrations) and never persisted the result, so the app
+seeded the id from `/auth/register` and the raw device list (matching its own registration serial
+to pick the right Household member) and short-circuited the library's lookup. All of that is gone.
 
 Still open on top of this: for a household member who genuinely does *not* own the devices, the
 library sends `account_customer_id` as both `customerId` and `target.customerId`
@@ -347,36 +344,22 @@ Local workarounds that exist only because `aioamazondevices` hasn't shipped the 
 released; leaving them in is not harmful (each degrades to a no-op) but they're dead weight
 and they monkey-patch private internals.
 
-| Waiting on | Local code to remove | How to verify it landed |
-|---|---|---|
-| [PR #1010 — *feat: move dnd to push events*](https://github.com/chemelli74/aioamazondevices/pull/1010) (open since 2026-08-05, checks green, awaiting review) | `AlexaService._allow_dnd_push_events()` and `_intercept_dnd_push_events()` / `_handle_dnd_push()` in `lib/alexa.py` | `AmazonPushMessage.DoNotDisturbChange` exists in `structures.py` |
+Nothing is pending right now.
 
-**Landed:** the voice-history fetch is gated on `on_history_event.frozen` as of **15.1.3**
+**Landed in 16.0.0** (shipped with 16.3.0 here):
+- DND over push ([PR #1010](https://github.com/chemelli74/aioamazondevices/pull/1010)):
+  `_allow_dnd_push_events()`, `_intercept_dnd_push_events()` and `_handle_dnd_push()` are gone,
+  replaced by an `on_dnd_event` subscription (see **Do Not Disturb is pushed *and* polled**).
+- The account customer id is looked up via `api/users/me` and persisted in `login_data`, so the
+  seeding in `_save_to_file`, the `_seed_customer_id_from_*()` helpers and
+  `_skip_known_customer_id_lookup()` are gone (see **Account customer id**).
+
+**Landed in 15.1.3:** the voice-history fetch is gated on `on_history_event.frozen`
 ([our PR #1045](https://github.com/chemelli74/aioamazondevices/pull/1045)), so
 `AlexaService._skip_unused_history_fetch()` is gone. Nothing here subscribes to
 `on_history_event`, so the library no longer fetches seven days of voice history on every
 "somebody spoke" push. The `Processing vocal history record` redaction in `lib/diagnostics.py`
 is kept as a backstop for the day something does subscribe.
-
-When #1010 ships, the replacement is a proper subscription rather than a patch — the PR adds
-an `on_dnd_event` Signal emitting `dict[str, bool]`, so wire it up next to the existing
-volume/media signals in `_after_login`:
-
-```python
-self._api.on_dnd_event.append(self._handle_dnd_signal)   # payload: {serial: enabled}
-self._api.on_dnd_event.freeze()
-```
-
-Both patches then go, and `_handle_dnd_push` collapses into that subscriber. Keep
-`sync_dnd()` either way — it seeds state at connect and is the fallback if push dies. Note
-the PR also moves DND out of `get_devices_data()` into `api.sync_dnd_state()`, so re-check
-`sync_dnd()`'s use of `_dnd_handler.get_do_not_disturb_status()` at the same time — that
-method is renamed to `sync_do_not_disturb_status()` there.
-
-Related but not blocking us: [#625 store account customer id](https://github.com/chemelli74/aioamazondevices/pull/625)
-touches the same area as the customer-id workaround in `_save_to_file` and
-`_skip_known_customer_id_lookup()`. Upstream's backlog is slow (14 open PRs, oldest from
-July 2025) — don't plan around any of these landing soon.
 
 ## Known limitations
 
