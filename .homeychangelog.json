@@ -109,5 +109,8 @@
   },
   "2.2.5": {
     "en": "Updates the Amazon library the app talks through. Do Not Disturb changes made in the Alexa app, by voice or by a routine now reach Homey through Amazon's own update instead of a workaround. Your account is now identified with a single request to Amazon instead of being worked out from your device list. Diagnostic reports now hide your name from that request."
+  },
+  "2.3.0": {
+    "en": "New: 'Announce with Voice' speaks in any Amazon Polly voice, including languages Alexa doesn't speak itself, such as Swedish, Danish or Polish. Like all announcements, it stays silent during Do Not Disturb. 'Say with Voice' now only lists the voices Alexa can speak directly, so it keeps talking during Do Not Disturb. Before, other voices quietly fell back to your Alexa's normal voice. Existing flows that use one of them keep working: they are now sent as an announcement, so they really speak in that voice."
   }
 }

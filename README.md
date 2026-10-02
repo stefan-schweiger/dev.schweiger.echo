@@ -10,7 +10,7 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 
 - **Device control** - Play/pause, skip tracks, adjust volume, and view now-playing info for Echo speakers and displays
 - **Text-to-speech** - Say messages, make announcements, or whisper to your Echo devices
-- **Say with Voice** - Speak (or whisper) in a specific Amazon Polly voice and language via SSML
+- **Say / Announce with Voice** - Speak, whisper or announce in a specific Amazon Polly voice and language via SSML, including languages Alexa doesn't speak itself (e.g. Swedish, Danish, Polish) as an announcement
 - **Voice commands** - Send voice commands to Echo devices remotely (same as speaking to the device)
 - **Sounds & routines** - Play notification sounds or trigger Alexa routines from Homey flows
 - **Alexa lists** - Start a flow when something is added to your shopping or to-do list, read a list into a flow, and remove or tick off items
@@ -35,7 +35,8 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 | Action | Description |
 |--------|-------------|
 | Say Message | Text-to-speech with speak, announce, or whisper mode |
-| Say with Voice | Speak or whisper using a specific Amazon Polly voice (with autocomplete) |
+| Say with Voice | Speak or whisper using a specific Amazon Polly voice (with autocomplete); offers the voices Alexa can speak directly |
+| Announce with Voice | Announce using any Amazon Polly voice, e.g. Swedish; silent during Do Not Disturb |
 | Tell Command | Execute a voice command on the device |
 | Play Sound | Play a notification sound (with autocomplete) |
 | Run Routine | Execute a saved Alexa routine (with autocomplete) |

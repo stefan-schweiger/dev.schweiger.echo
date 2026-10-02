@@ -128,3 +128,28 @@ VOICES: list[dict[str, str]] = [
     {"id": "Filiz", "lang": "tr-TR", "name": "Turkish - Filiz"},
     {"id": "Gwyneth", "lang": "cy-GB", "name": "Welsh - Gwyneth"},
 ]
+
+# The VOICES that Alexa.Speak renders: the "Supported Amazon Polly voices" table
+# of the Alexa SSML reference
+# (https://developer.amazon.com/en-US/docs/alexa/custom-skills/speech-synthesis-markup-language-ssml-reference.html).
+# Speak silently drops any other voice and reads the text in the account's own
+# voice — on a German account "Swedish - Astrid" and "Danish - Mads" came out
+# as the German Alexa voice, while Brian (listed) spoke English as asked. Those
+# other voices do work as an SSML announcement (verified on-device for Astrid
+# and Mads), which is what the old alexa-remote2 based app always sent.
+SPEAK_VOICES: frozenset[str] = frozenset({
+    "Ivy", "Joanna", "Joey", "Justin", "Kendra", "Kimberly", "Matthew", "Salli",  # en-US
+    "Nicole", "Russell",  # en-AU
+    "Amy", "Brian", "Emma",  # en-GB
+    "Aditi", "Raveena",  # en-IN
+    "Geraint",  # en-GB-WLS
+    "Chantal",  # fr-CA
+    "Celine", "Lea", "Mathieu",  # fr-FR
+    "Hans", "Marlene", "Vicki",  # de-DE
+    "Carla", "Giorgio", "Bianca",  # it-IT
+    "Mizuki", "Takumi",  # ja-JP
+    "Vitoria", "Camila", "Ricardo",  # pt-BR
+    "Penelope", "Lupe", "Miguel",  # es-US
+    "Conchita", "Enrique", "Lucia",  # es-ES
+    "Mia",  # es-MX
+})

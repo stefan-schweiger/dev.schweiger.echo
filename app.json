@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "2.2.5",
+  "version": "2.3.0",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -1134,18 +1134,18 @@
           "ko": "[[voice]] 음성으로 [[speech]][[message]]"
         },
         "hint": {
-          "en": "Say or whisper a message using a specific Amazon Polly voice.",
-          "de": "Sage oder flüstere eine Nachricht mit einer bestimmten Amazon Polly-Stimme.",
-          "fr": "Dites ou chuchotez un message en utilisant une voix Amazon Polly spécifique.",
-          "nl": "Zeg of fluister een bericht met een specifieke Amazon Polly-stem.",
-          "it": "Dì o sussurra un messaggio usando una voce Amazon Polly specifica.",
-          "es": "Di o susurra un mensaje usando una voz específica de Amazon Polly.",
-          "sv": "Säg eller viska ett meddelande med en specifik Amazon Polly-röst.",
-          "no": "Si eller hvisk en melding med en bestemt Amazon Polly-stemme.",
-          "da": "Sig eller hvisk en besked med en bestemt Amazon Polly-stemme.",
-          "pl": "Powiedz lub szepnij wiadomość, używając określonego głosu Amazon Polly.",
-          "ru": "Произнесите или прошепчите сообщение определённым голосом Amazon Polly.",
-          "ko": "특정 Amazon Polly 음성으로 메시지를 말하거나 속삭입니다."
+          "en": "Say or whisper a message using a specific Amazon Polly voice. Offers the voices Alexa can speak directly; for others, such as Swedish, use Announce with Voice.",
+          "de": "Sage oder flüstere eine Nachricht mit einer bestimmten Amazon Polly-Stimme. Bietet die Stimmen, die Alexa direkt sprechen kann; für andere, z. B. Schwedisch, nutze „Mit Stimme ankündigen“.",
+          "fr": "Dites ou chuchotez un message en utilisant une voix Amazon Polly spécifique. Propose les voix qu'Alexa peut utiliser directement ; pour les autres, comme le suédois, utilisez « Annoncer avec une voix ».",
+          "nl": "Zeg of fluister een bericht met een specifieke Amazon Polly-stem. Biedt de stemmen die Alexa direct kan gebruiken; gebruik voor andere, zoals Zweeds, 'Aankondigen met stem'.",
+          "it": "Dì o sussurra un messaggio usando una voce Amazon Polly specifica. Offre le voci che Alexa può usare direttamente; per le altre, come lo svedese, usa «Annuncia con voce».",
+          "es": "Di o susurra un mensaje usando una voz específica de Amazon Polly. Ofrece las voces que Alexa puede usar directamente; para otras, como el sueco, usa «Anunciar con voz».",
+          "sv": "Säg eller viska ett meddelande med en specifik Amazon Polly-röst. Erbjuder de röster som Alexa kan använda direkt; för andra, som svenska, använd ”Tillkännage med röst”.",
+          "no": "Si eller hvisk en melding med en bestemt Amazon Polly-stemme. Tilbyr stemmene Alexa kan bruke direkte; for andre, som svensk, bruk «Kunngjør med stemme».",
+          "da": "Sig eller hvisk en besked med en bestemt Amazon Polly-stemme. Tilbyder de stemmer, Alexa kan bruge direkte; til andre, som svensk, brug »Annoncér med stemme«.",
+          "pl": "Powiedz lub szepnij wiadomość, używając określonego głosu Amazon Polly. Zawiera głosy, których Alexa może używać bezpośrednio; dla innych, np. szwedzkiego, użyj „Ogłoś głosem”.",
+          "ru": "Произнесите или прошепчите сообщение определённым голосом Amazon Polly. Доступны голоса, которые Alexa может использовать напрямую; для остальных, например шведского, используйте «Объявить голосом».",
+          "ko": "특정 Amazon Polly 음성으로 메시지를 말하거나 속삭입니다. Alexa가 직접 사용할 수 있는 음성만 제공합니다. 스웨덴어 등 다른 음성은 '음성으로 공지'를 사용하세요."
         },
         "args": [
           {
@@ -1206,6 +1206,94 @@
                 }
               }
             ]
+          },
+          {
+            "type": "autocomplete",
+            "name": "voice",
+            "placeholder": {
+              "en": "Voice",
+              "de": "Stimme",
+              "fr": "Voix",
+              "nl": "Stem",
+              "it": "Voce",
+              "es": "Voz",
+              "sv": "Röst",
+              "no": "Stemme",
+              "da": "Stemme",
+              "pl": "Głos",
+              "ru": "Голос",
+              "ko": "음성"
+            }
+          },
+          {
+            "type": "text",
+            "name": "message",
+            "placeholder": {
+              "en": "Message",
+              "de": "Nachricht",
+              "fr": "Message",
+              "nl": "Bericht",
+              "it": "Messaggio",
+              "es": "Mensaje",
+              "sv": "Meddelande",
+              "no": "Melding",
+              "da": "Besked",
+              "pl": "Wiadomość",
+              "ru": "Сообщение",
+              "ko": "메시지"
+            }
+          }
+        ]
+      },
+      {
+        "id": "announce_with_voice",
+        "title": {
+          "en": "Announce with Voice",
+          "de": "Mit Stimme ankündigen",
+          "fr": "Annoncer avec une voix",
+          "nl": "Aankondigen met stem",
+          "it": "Annuncia con voce",
+          "es": "Anunciar con voz",
+          "sv": "Tillkännage med röst",
+          "no": "Kunngjør med stemme",
+          "da": "Annoncér med stemme",
+          "pl": "Ogłoś głosem",
+          "ru": "Объявить голосом",
+          "ko": "음성으로 공지"
+        },
+        "titleFormatted": {
+          "en": "Announce [[message]] with [[voice]] voice",
+          "de": "Ankündige [[message]] mit [[voice]] Stimme",
+          "fr": "Annoncer [[message]] avec la voix [[voice]]",
+          "nl": "Aankondigen [[message]] met [[voice]] stem",
+          "it": "Annuncia [[message]] con voce [[voice]]",
+          "es": "Anunciar [[message]] con voz [[voice]]",
+          "sv": "Tillkännage [[message]] med rösten [[voice]]",
+          "no": "Kunngjør [[message]] med stemmen [[voice]]",
+          "da": "Annoncér [[message]] med stemmen [[voice]]",
+          "pl": "Ogłoś [[message]] głosem [[voice]]",
+          "ru": "Объявить [[message]] голосом [[voice]]",
+          "ko": "[[voice]] 음성으로 [[message]] 공지"
+        },
+        "hint": {
+          "en": "Announce a message using a specific Amazon Polly voice. Works with every voice, including languages Alexa doesn't speak itself, such as Swedish. Like all announcements, it stays silent while Do Not Disturb is on.",
+          "de": "Kündige eine Nachricht mit einer bestimmten Amazon Polly-Stimme an. Funktioniert mit jeder Stimme, auch in Sprachen, die Alexa selbst nicht spricht, wie Schwedisch. Wie alle Ankündigungen bleibt sie stumm, solange „Bitte nicht stören“ aktiv ist.",
+          "fr": "Annoncez un message avec une voix Amazon Polly spécifique. Fonctionne avec toutes les voix, y compris dans les langues qu'Alexa ne parle pas elle-même, comme le suédois. Comme toutes les annonces, elle reste muette tant que « Ne pas déranger » est activé.",
+          "nl": "Kondig een bericht aan met een specifieke Amazon Polly-stem. Werkt met elke stem, ook in talen die Alexa zelf niet spreekt, zoals Zweeds. Zoals alle aankondigingen blijft het stil zolang 'Niet storen' aan staat.",
+          "it": "Annuncia un messaggio con una voce Amazon Polly specifica. Funziona con tutte le voci, anche nelle lingue che Alexa non parla, come lo svedese. Come tutti gli annunci, resta in silenzio finché è attivo «Non disturbare».",
+          "es": "Anuncia un mensaje con una voz específica de Amazon Polly. Funciona con todas las voces, incluso en idiomas que Alexa no habla, como el sueco. Como todos los anuncios, no suena mientras «No molestar» esté activado.",
+          "sv": "Tillkännage ett meddelande med en specifik Amazon Polly-röst. Fungerar med alla röster, även på språk som Alexa själv inte talar, som svenska. Precis som alla tillkännagivanden hörs det inte när Stör ej är på.",
+          "no": "Kunngjør en melding med en bestemt Amazon Polly-stemme. Fungerer med alle stemmer, også på språk Alexa ikke snakker selv, som svensk. Som alle kunngjøringer er den stille mens Ikke forstyrr er på.",
+          "da": "Annoncér en besked med en bestemt Amazon Polly-stemme. Virker med alle stemmer, også på sprog som Alexa ikke selv taler, som svensk. Som alle annonceringer er den lydløs, mens Forstyr ikke er slået til.",
+          "pl": "Ogłoś wiadomość określonym głosem Amazon Polly. Działa z każdym głosem, także w językach, których Alexa sama nie obsługuje, np. szwedzkim. Jak wszystkie ogłoszenia, nie jest odtwarzane, gdy włączony jest tryb Nie przeszkadzać.",
+          "ru": "Объявите сообщение определённым голосом Amazon Polly. Работает со всеми голосами, включая языки, на которых Alexa сама не говорит, например шведский. Как и все объявления, не воспроизводится, пока включён режим «Не беспокоить».",
+          "ko": "특정 Amazon Polly 음성으로 메시지를 공지합니다. 스웨덴어처럼 Alexa가 직접 지원하지 않는 언어를 포함해 모든 음성에서 작동합니다. 다른 공지와 마찬가지로 방해 금지 모드가 켜져 있으면 재생되지 않습니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
           },
           {
             "type": "autocomplete",

@@ -46,7 +46,7 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 | `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
 | `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
 | `lib/diagnostics.py` | Opt-in bridge from the library's Python logger into Homey's app log (redacts bearer/CSRF values). Toggled from app settings; see **Diagnostics & support reports**. |
-| `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say with Voice"). |
+| `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say/Announce with Voice") and `SPEAK_VOICES` (the subset Alexa.Speak renders). |
 | `drivers/echo/driver.py` | Pairing (filters `ECHO`/`KNIGHT`/`ROOK`) + flow-action registration (incl. sound/routine/voice autocompletes). |
 | `drivers/echo/device.py` | Capabilities, capability listeners, `apply_volume`/`apply_media`, album art, availability. |
 | `drivers/group/*` | Speaker-group driver/device — same structure; pairing filters the `WHA` family. |
@@ -279,6 +279,8 @@ Background and the full investigation record live in [`docs/dns-investigation.md
 
 ### SSML
 `call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.
+
+**Speak only renders some Polly voices.** `Alexa.Speak` honours `<voice>` only for the voices in Amazon's "Supported Amazon Polly voices" table (`SPEAK_VOICES` in `lib/constants.py`) — in any language, e.g. Brian speaks English on a German account. Any other voice is **dropped without an error** and the text is read in the account's own voice, so "Swedish - Astrid" sounded like the German Alexa. The same SSML sent as an **AlexaAnnouncement with `speak.type: "ssml"`** does render them (verified on-device: Astrid, Mads; no chime was heard), which is what the old alexa-remote2 app sent for every voice. Hence two cards rather than one card choosing per voice: **Say with Voice** only offers `SPEAK_VOICES` and keeps speaking during Do Not Disturb (verified on-device: Speak talks, the announcement doesn't), **Announce with Voice** offers every voice and is silenced by it. A Homey dropdown can't clear an autocomplete value already picked, so a single card with a Say/Announce choice could still end up as "Say + Astrid". Flows saved before the split that hold a non-Speak voice on Say with Voice are announced instead (`say_with_voice`), so they keep working. The library only builds *text* announcements, so `_announce_ssml` takes its node and flips the type (private API, pinned to aioamazondevices==16.3.0). The content `locale` made no difference on-device (account locale, the voice's locale and alexa-remote2's hard-coded `de-DE` all worked).
 
 ### Routines *are* device specific
 

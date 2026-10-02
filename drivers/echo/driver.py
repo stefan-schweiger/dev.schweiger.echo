@@ -26,12 +26,28 @@ class EchoDriver(driver.Driver):
         async def on_message(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.say(_serial(args), args["message"], args["speech"])
 
-        async def autocomplete_voice(query: str, **kwargs) -> list[dict]:
-            return [{"name": v["name"], "data": {"id": v["id"]}} for v in self._alexa.list_voices(query)]
+        def voice_choices(query: str, speak_only: bool) -> list[dict]:
+            return [
+                {"name": v["name"], "data": {"id": v["id"]}}
+                for v in self._alexa.list_voices(query, speak_only=speak_only)
+            ]
+
+        # Say with Voice only offers what Alexa.Speak can render; every other
+        # voice lives on Announce with Voice. See "SSML" in AGENTS.md.
+        async def autocomplete_speak_voice(query: str, **kwargs) -> list[dict]:
+            return voice_choices(query, speak_only=True)
+
+        async def autocomplete_announce_voice(query: str, **kwargs) -> list[dict]:
+            return voice_choices(query, speak_only=False)
 
         async def on_message_with_voice(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.say_with_voice(
                 _serial(args), args["message"], args["voice"]["data"]["id"], args["speech"]
+            )
+
+        async def on_announce_with_voice(args: Mapping[str, Any], **kwargs) -> None:
+            await self._alexa.announce_with_voice(
+                _serial(args), args["message"], args["voice"]["data"]["id"]
             )
 
         async def on_command(args: Mapping[str, Any], **kwargs) -> None:
@@ -109,8 +125,11 @@ class EchoDriver(driver.Driver):
 
         flow.get_action_card("message").register_run_listener(_explained(on_message))
         voice = flow.get_action_card("message_with_voice")
-        voice.register_argument_autocomplete_listener("voice", autocomplete_voice)
+        voice.register_argument_autocomplete_listener("voice", autocomplete_speak_voice)
         voice.register_run_listener(_explained(on_message_with_voice))
+        announce_voice = flow.get_action_card("announce_with_voice")
+        announce_voice.register_argument_autocomplete_listener("voice", autocomplete_announce_voice)
+        announce_voice.register_run_listener(_explained(on_announce_with_voice))
         flow.get_action_card("command").register_run_listener(_explained(on_command))
         sound = flow.get_action_card("play-sound")
         sound.register_argument_autocomplete_listener("sound", autocomplete_sound)

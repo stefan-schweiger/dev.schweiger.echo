@@ -42,11 +42,12 @@ from aioamazondevices.structures import (
     AmazonListItemStatus,
     AmazonMediaControls,
     AmazonSaveDataConfig,
+    AmazonSequenceNode,
     AmazonSequenceType,
 )
 
 from .connection import unresolved_host_message
-from .constants import DEVICES, VOICES
+from .constants import DEVICES, SPEAK_VOICES, VOICES
 
 VOLUME_DIVISOR = 100
 
@@ -165,6 +166,15 @@ def login_error_message(e: BaseException) -> str:
             "to clear any extra verification step."
         )
     return unresolved_host_message(e) or f"{type(e).__name__}: {e}"
+
+
+def _voice_ssml(message: str, voice_id: str, mode: str) -> str:
+    """SSML speaking `message` in the Polly voice `voice_id` ("Hans:de-DE")."""
+    voice, _, lang = voice_id.partition(":")
+    content = escape_xml(message)
+    if mode == "whisper":
+        content = f'<amazon:effect name="whispered">{content}</amazon:effect>'
+    return f'<speak><voice name="{voice}"><lang xml:lang="{lang}">{content}</lang></voice></speak>'
 
 
 def heal_stale_session(method):
@@ -1293,16 +1303,56 @@ class AlexaService:
     @heal_stale_session
     async def say_with_voice(self, serial: str, message: str, voice_id: str, mode: str = "speak") -> None:
         # voice_id is "<PollyVoice>:<lang>" (e.g. "Hans:de-DE"). Rendered via SSML.
-        voice, _, lang = voice_id.partition(":")
-        content = escape_xml(message)
-        if mode == "whisper":
-            content = f'<amazon:effect name="whispered">{content}</amazon:effect>'
-        ssml = f'<speak><voice name="{voice}"><lang xml:lang="{lang}">{content}</lang></voice></speak>'
-        await self._api.call_alexa_speak(self._device(serial), ssml)
+        device = self._device(serial)
+        ssml = _voice_ssml(message, voice_id, mode)
+        if voice_id.partition(":")[0] in SPEAK_VOICES:
+            await self._api.call_alexa_speak(device, ssml)
+            return
+        # Only a Flow saved before "Announce with Voice" existed gets here: the
+        # card stopped offering these voices because Speak reads them in the
+        # account's own voice. Announce instead so the Flow keeps working — at
+        # the cost of Do Not Disturb silencing it, as on the Announce card.
+        await self._announce_ssml(device, ssml, message)
 
-    def list_voices(self, query: str = "") -> list[dict]:
+    @heal_stale_session
+    async def announce_with_voice(self, serial: str, message: str, voice_id: str) -> None:
+        await self._announce_ssml(self._device(serial), _voice_ssml(message, voice_id, "speak"), message)
+
+    async def _announce_ssml(self, device: AmazonDevice, ssml: str, text: str) -> None:
+        """Speak `ssml` as an SSML announcement instead of through Alexa.Speak.
+
+        Alexa.Speak drops every Polly voice outside SPEAK_VOICES and reads the
+        text in the account's own voice; an AlexaAnnouncement with
+        `speak.type: "ssml"` renders them (see "SSML" in AGENTS.md). That is
+        what the old alexa-remote2 based app sent. The library only builds text
+        announcements, so take its node, flip the type and queue it the way
+        `send_message` queues its own. Private API — pinned to
+        aioamazondevices==16.3.0, re-check on library bumps.
+        """
+        handler = self._api._sequence_handler
+        node = handler._build_operation_node(device, AmazonSequenceType.Announcement, ssml)
+        content = node["operationPayload"]["content"][0]
+        content["speak"]["type"] = "ssml"
+        # Echo Show screens print the body; give them the words, not the markup.
+        content["display"]["body"] = text
+        await handler._enqueue_sequence(
+            AmazonSequenceNode(
+                message_type=AmazonSequenceType.Announcement,
+                message_body=ssml,
+                music_provider_id=None,
+                device=device,
+                operation_node=node,
+            )
+        )
+
+    def list_voices(self, query: str = "", speak_only: bool = False) -> list[dict]:
+        """Voices for a picker. `speak_only` limits it to what Alexa.Speak renders."""
         q = (query or "").lower()
-        voices = [{"id": f"{v['id']}:{v['lang']}", "name": v["name"]} for v in VOICES]
+        voices = [
+            {"id": f"{v['id']}:{v['lang']}", "name": v["name"]}
+            for v in VOICES
+            if not speak_only or v["id"] in SPEAK_VOICES
+        ]
         return sorted(
             (v for v in voices if q in v["name"].lower()),
             key=lambda v: v["name"],
