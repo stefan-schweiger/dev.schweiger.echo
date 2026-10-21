@@ -11,7 +11,7 @@ A Homey app (**Python** Apps SDK v3, runs on Homey's CPython 3.14 runtime) that 
 ## Tech stack
 
 - **Language/runtime:** Python (Homey runs CPython **3.14**); `"runtime": "python"`, `"pythonVersion": "3.14"` in the manifest.
-- **Core dependency:** `aioamazondevices==16.3.0` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
+- **Core dependency:** `aioamazondevices==16.8.1` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
 - **Platform:** Homey Apps SDK v3. **Requires Homey firmware >= 13.0.0** (Python apps).
 - **No test framework.** Validate with `homey app run` against a real Homey + Amazon account.
 - Type-checking (optional, local): `homey-stubs` + pyright.
@@ -84,6 +84,21 @@ member's real volume with the average. Nothing is lost by dropping it: setting a
 sequence *per cluster member*, so Amazon pushes every member individually and the group tile
 gets its average for free. Media still fans out — group media state is reported on the group.
 
+**An ended media session clears `speaker_playing`.** Amazon has no "stopped" state. When
+playback ends the device drops out of `np/list-media-sessions` (the library then reports
+`player_state=None` for it, or an empty payload when nothing plays anywhere). Up to 2.3.0
+`apply_media` ignored both, so the last PLAYING stuck on the tile, and stayed there across
+restarts because Homey keeps capability values. Support log `c5021fa8`: an Echo Spot showed
+"playing" and Pause got a 404. The list also drops a device briefly around track changes, so
+`AlexaService._clear_ended_media_sessions()` sends `None` only after a device has been missing
+for `MEDIA_IDLE_GRACE_S` across two observations (push events and the 5-min heartbeat). That
+means a stale tile can take one or two heartbeats to clear. A member is never cleared while
+its group is in session, and an ended session is **not** fanned out (each device is judged on
+its own, so a member playing on its own isn't stopped by its idle group).
+`AlexaService.playback()` treats a **404 on Pause** as success, since there is nothing to pause.
+A 404 on Play/Next/Previous raises "Nothing is playing or paused on this device" instead of
+the library's bare "Request failed: Not Found".
+
 ### Device settings (screen power / brightness) — not in the library
 
 `aioamazondevices` doesn't wrap Amazon's per-device settings endpoint, so `AlexaService`
@@ -135,7 +150,7 @@ same `on_dnd_event` signal, so both paths converge on `App._on_dnd` → `EchoDev
 
 ### Authentication & connection
 - **Sign-in (interactive):** `AmazonEchoApi(session, email, password)` → `api.login.login_mode_interactive(otp)` runs OAuth+PKCE + `POST /auth/register`, yielding a long-lived `refresh_token` (+ `macDms`, cookies). The whole `login_data` dict is stored in Homey settings under `login_data` (email under `email`). Authenticator-app TOTP is **required** (SMS/email codes don't work).
-- **Reconnect (stored):** `api.login.login_mode_stored_data()` — no credentials needed; access tokens/cookies are re-minted from the refresh token.
+- **Reconnect (stored):** `api.login.login_mode_stored_data()` — no credentials needed; access tokens/cookies are re-minted from the refresh token. Since 16.4.0 it also re-registers the device capabilities (an extra token refresh plus a `PUT`) on every call. So connect and session recovery call it. The 5-minute heartbeat only calls it while the account customer id is still missing (a stored login that failed partway), because that lookup is all it ever did there.
 - **Auto-connect is deferred** off `on_init` via `set_timeout(..., 2000)` so drivers initialize first (otherwise `on_state_change` hits "Driver Not Initialized").
 - **Login runs in the background** (`asyncio.create_task`): `connect()` returns immediately because Homey's settings web-api call times out at **10 s** while login takes **~15 s**. The settings page polls `/status` (`disconnected`/`connecting`/`connected`/`error`, plus `error` message) to drive the UI.
 - **Push:** `start_http2_processing(httpx_client, on_reauth_required=...)` opens the AVS directive stream; it reconnects itself. A true `CannotAuthenticate` triggers re-auth. The httpx client comes from `AlexaService._push_client()` and **must never be None**: the library stores whatever it is handed and dereferences it on every reconnect, so a None client kills the channel permanently (`'NoneType' object has no attribute 'stream'`, retried 5s→600s). That is why the client is created on demand there instead of during login — a login that fails partway keeps `_api` alive for the heartbeat to retry, and the heartbeat's `ensure_push_channel()` is a caller too.
@@ -229,8 +244,14 @@ What a user's diagnostic report tells you, and why these lines exist:
   `Cannot resolve <host> — your network returns no address for it` means DNS, not Amazon — the
   library reports every transport failure as the same `CannotConnect`, so this walks the cause
   chain for a `socket.gaierror` and names the host. `Amazon did not complete the sign-in` is the
-  library's raw `KeyError: 'openid.oa2.authorization_code'`, i.e. Amazon returned no
+  library's raw `CannotAuthenticate: Unable to extract authorization code from url: …` (a bare
+  `KeyError: 'openid.oa2.authorization_code'` up to 16.3.0), i.e. Amazon returned no
   authorization code: wrong/expired 2-step code, a captcha, or an extra verification step.
+  `Your Amazon account has no country/region set …` is the library's `MissingCountryError`
+  (16.8.1), raised by the `users/me` lookup when `countryOfResidence` is empty. Without a country
+  everything falls back to amazon.com, and in home-assistant/core#186163 every device showed
+  offline. Only the account owner can fix it, in Amazon's Country/Region settings. It is
+  deliberately not `needs_reauth`, which would delete the stored login.
 - **Opt-in** (settings → debug logging): the library's own DEBUG stream, incl. the full
   automations payload. Verbose — a routine-heavy account dumps every routine's sequence JSON.
 - **Temporary** — `AlexaService._probe_routines()` fires only when the routine list comes back
@@ -280,7 +301,7 @@ Background and the full investigation record live in [`docs/dns-investigation.md
 ### SSML
 `call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.
 
-**Speak only renders some Polly voices.** `Alexa.Speak` honours `<voice>` only for the voices in Amazon's "Supported Amazon Polly voices" table (`SPEAK_VOICES` in `lib/constants.py`) — in any language, e.g. Brian speaks English on a German account. Any other voice is **dropped without an error** and the text is read in the account's own voice, so "Swedish - Astrid" sounded like the German Alexa. The same SSML sent as an **AlexaAnnouncement with `speak.type: "ssml"`** does render them (verified on-device: Astrid, Mads; no chime was heard), which is what the old alexa-remote2 app sent for every voice. Hence two cards rather than one card choosing per voice: **Say with Voice** only offers `SPEAK_VOICES` and keeps speaking during Do Not Disturb (verified on-device: Speak talks, the announcement doesn't), **Announce with Voice** offers every voice and is silenced by it. A Homey dropdown can't clear an autocomplete value already picked, so a single card with a Say/Announce choice could still end up as "Say + Astrid". Flows saved before the split that hold a non-Speak voice on Say with Voice are announced instead (`say_with_voice`), so they keep working. The library only builds *text* announcements, so `_announce_ssml` takes its node and flips the type (private API, pinned to aioamazondevices==16.3.0). The content `locale` made no difference on-device (account locale, the voice's locale and alexa-remote2's hard-coded `de-DE` all worked).
+**Speak only renders some Polly voices.** `Alexa.Speak` honours `<voice>` only for the voices in Amazon's "Supported Amazon Polly voices" table (`SPEAK_VOICES` in `lib/constants.py`) — in any language, e.g. Brian speaks English on a German account. Any other voice is **dropped without an error** and the text is read in the account's own voice, so "Swedish - Astrid" sounded like the German Alexa. The same SSML sent as an **AlexaAnnouncement with `speak.type: "ssml"`** does render them (verified on-device: Astrid, Mads; no chime was heard), which is what the old alexa-remote2 app sent for every voice. Hence two cards rather than one card choosing per voice: **Say with Voice** only offers `SPEAK_VOICES` and keeps speaking during Do Not Disturb (verified on-device: Speak talks, the announcement doesn't), **Announce with Voice** offers every voice and is silenced by it. A Homey dropdown can't clear an autocomplete value already picked, so a single card with a Say/Announce choice could still end up as "Say + Astrid". Flows saved before the split that hold a non-Speak voice on Say with Voice are announced instead (`say_with_voice`), so they keep working. The library only builds *text* announcements, so `_announce_ssml` takes its node and flips the type (private API, pinned to aioamazondevices==16.8.1), passing the plain text as `display_text` so Echo Show screens don't print the markup. The content `locale` made no difference on-device (account locale, the voice's locale and alexa-remote2's hard-coded `de-DE` all worked).
 
 ### Routines *are* device specific
 
@@ -347,6 +368,37 @@ released; leaving them in is not harmful (each degrades to a no-op) but they're 
 and they monkey-patch private internals.
 
 Nothing is pending right now.
+
+**What changed under us in 16.3.1 → 16.8.1** (no workaround was dropped):
+- **Do not run 16.3.0 with aiohttp ≥ 3.14.4.** aiohttp 3.14.4 (2026-10-05) changed cookie
+  domain matching. The library set cookies against the literal host `.amazon.<tld>`, so they
+  stopped reaching `alexa.amazon.<tld>` and every call answered 401 (upstream #1133 and #1132,
+  fixed in 16.3.2). 16.3.0 doesn't cap aiohttp, so rebuilding its dependencies after that date
+  pulls in the bug. `_refresh_website_cookies` goes through the library's `set_cookies` and
+  picks up the fix.
+- **The device list comes from GraphQL** (16.3.1): `_device_handler.get_base_devices()` became
+  `update_devices()`. See `refresh_devices` for what that changes.
+- **Stored login re-registers capabilities** (16.4.0, upstream PR #1108), and the set now
+  includes `Alexa.Mobile.Push` 1.1 with the `smarthome-events` format. With that, Amazon pushes
+  an `FDAL_UPDATE` for every light, plug and sensor in the household. The library doesn't handle
+  them yet and nothing here wants them, so `_opt_out_of_smart_home_push()` (called from
+  `_build`) puts back the 1.0 entry without that format, as registered up to 16.3.0. All other
+  capability changes are kept. This is a local choice, not a pending fix: re-check it on bumps,
+  and drop it if a feature ever needs smart-home events.
+- **The device query still lists every endpoint.** Since 16.3.1 `listEndpoints` has no
+  `displayCategory` filter, so the household's smart-home devices come back too. The library
+  skips them because they have no devices-v2 entry, but they make the response bigger and show
+  up in the DEBUG dump. Narrowing the query to `ALEXA_VOICE_ENABLED` (what 16.3.0 used) was
+  considered and not done: GraphQL now decides which devices exist at all, so any Echo missing
+  from that category would disappear from the app.
+- **A missing authorization code** raises `CannotAuthenticate` instead of `KeyError`
+  (`login_error_message`).
+- Announcements take a `display_text` (16.7.0), which `_announce_ssml` now uses.
+- **An account with no country of residence is refused** (16.8.1, upstream PR #1172):
+  `MissingCountryError` from every interactive sign-in, and from a stored login that still
+  has to look up the customer id. `MISSING_COUNTRY_MESSAGE` (`lib/connection.py`) tells the user
+  where to set the country. This runs before `_apply_pinned_site()`, so pinning a server in app
+  settings doesn't get such an account past it.
 
 **Landed in 16.0.0** (shipped with 16.3.0 here):
 - DND over push ([PR #1010](https://github.com/chemelli74/aioamazondevices/pull/1010)):

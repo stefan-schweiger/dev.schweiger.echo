@@ -84,6 +84,10 @@ class App(app.App):
     async def on_uninit(self) -> None:
         if getattr(self, "_sync_interval", None) is not None:
             self.homey.clear_interval(self._sync_interval)
+        # Homey is already shutting the app down, and marking each device
+        # unavailable at this point raises. That traceback ended up in the stderr
+        # of every support report (e.g. c5021fa8).
+        self.alexa.on_state_change = None
         await self.alexa.stop()
 
     # --- web-api entrypoints (called from api.py) ------------------------
@@ -261,6 +265,12 @@ class App(app.App):
         await self._apply(serial, lambda d: d.apply_volume(value))
 
     async def _on_media(self, serial: str, media) -> None:
+        if media is None:
+            # An ended session is reported for each device, members included, so
+            # mirroring a group's onto its members would only stop a member that
+            # is playing on its own.
+            await self._apply(serial, lambda d: d.apply_media(None))
+            return
         await self._fanout(serial, lambda d: d.apply_media(media))
 
     async def _on_dnd(self, statuses: dict[str, bool]) -> None:

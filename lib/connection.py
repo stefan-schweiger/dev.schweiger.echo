@@ -9,6 +9,18 @@ from aioamazondevices.exceptions import (
     CannotConnect,
     CannotRegisterDevice,
     CannotRetrieveData,
+    MissingCountryError,
+)
+
+# aioamazondevices 16.8.1 refuses an account whose Amazon profile has no country
+# of residence (MissingCountryError, which carries no message). Without one
+# everything falls back to amazon.com, and in the report behind the check every
+# device showed offline (home-assistant/core#186163). Only the account owner can
+# fix it, and signing in again won't help until they do.
+MISSING_COUNTRY_MESSAGE = (
+    "Your Amazon account has no country/region set, so Amazon cannot tell which "
+    "Alexa service it belongs to. Set it on the Amazon website under Manage Your "
+    "Content and Devices → Preferences → Country/Region Settings, then sign in again."
 )
 
 
@@ -117,6 +129,15 @@ def categorize_error(e: Exception) -> dict:
             "should_retry": True,
             "needs_reauth": False,
             "message": "Cannot reach Amazon — will retry",
+        }
+    if isinstance(e, MissingCountryError):
+        # Not needs_reauth: that would throw away the stored login, and the fix
+        # is on Amazon's side.
+        return {
+            "category": "account",
+            "should_retry": False,
+            "needs_reauth": False,
+            "message": MISSING_COUNTRY_MESSAGE,
         }
     if isinstance(e, CannotRetrieveData):
         return {

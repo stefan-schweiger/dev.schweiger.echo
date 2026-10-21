@@ -14,7 +14,7 @@ import json
 import socket
 import ssl
 import time
-from http import HTTPMethod
+from http import HTTPMethod, HTTPStatus
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 from xml.sax.saxutils import escape as escape_xml
@@ -25,7 +25,12 @@ from aiohttp.resolver import ThreadedResolver
 import httpx
 from yarl import URL
 from aioamazondevices.api import AmazonEchoApi
-from aioamazondevices.exceptions import CannotAuthenticate
+from aioamazondevices.capabilities import DEVICE_CAPABILITIES
+from aioamazondevices.exceptions import (
+    CannotAuthenticate,
+    CannotRetrieveData,
+    MissingCountryError,
+)
 from aioamazondevices.const.http import (
     ARRAY_WRAPPER,
     DEFAULT_SITE,
@@ -46,7 +51,7 @@ from aioamazondevices.structures import (
     AmazonSequenceType,
 )
 
-from .connection import unresolved_host_message
+from .connection import MISSING_COUNTRY_MESSAGE, unresolved_host_message
 from .constants import DEVICES, SPEAK_VOICES, VOICES
 
 VOLUME_DIVISOR = 100
@@ -67,6 +72,10 @@ GROUP_FAMILY = "WHA"
 # Per-device settings (screen power, brightness, …). Not exposed by
 # aioamazondevices; keyed on deviceAccountId, not the serial number.
 URI_DEVICE_SETTINGS = "api/v1/devices/{account_id}/settings/{name}"
+
+# How long a device must be missing from Amazon's media-session list before it
+# counts as stopped — see _clear_ended_media_sessions.
+MEDIA_IDLE_GRACE_S = 60
 
 # Soft-recovery throttle. A genuine auth failure (CannotAuthenticate) makes the
 # library refresh the access token and *still* get rejected, so an unbounded
@@ -126,11 +135,11 @@ OTP_PAGE_MISSING = "MFA OTP code not found on login page"
 # _log_account_context, which must not compare against the wrong form.
 OBFUSCATED_CUSTOMER_ID_PREFIX = "amzn1.account."
 
-# The library reads Amazon's post-login redirect with a raw dict lookup
-# (AmazonLogin._extract_code_from_url), so anything other than the expected
-# "here is your authorization code" redirect surfaces as a bare KeyError naming
-# the missing query parameter — which is what the user was shown.
-AUTH_CODE_PARAM = "openid.oa2.authorization_code"
+# What AmazonLogin._extract_code_from_url raises when Amazon's post-login
+# redirect carries no authorization code. It is followed by the full redirect
+# URL, which is what the user was shown. Up to 16.3.0 this was a bare
+# KeyError: 'openid.oa2.authorization_code'.
+AUTH_CODE_MISSING = "Unable to extract authorization code"
 
 _PLAYBACK = {
     "play": AmazonMediaControls.Play,
@@ -138,6 +147,28 @@ _PLAYBACK = {
     "next": AmazonMediaControls.Next,
     "previous": AmazonMediaControls.Previous,
 }
+
+
+def _opt_out_of_smart_home_push() -> None:
+    """Register our virtual device without the smart-home push event format.
+
+    Since aioamazondevices 16.4.0 (upstream PR #1108) the device registers
+    `Alexa.Mobile.Push` 1.1 with the `smarthome-events` format. With that, Amazon
+    sends an FDAL_UPDATE over the push channel for every light, plug and sensor
+    in the household. The library doesn't handle them yet ("Unhandled push event
+    type") and this app has no use for them, but on a big smart home they would
+    make up most of the push traffic. So restore the 1.0 entry that 16.3.0 and
+    every earlier release registered.
+
+    The library sends this dict unchanged on every capability registration
+    (interactive sign-in and, since 16.4.0, every stored login), so changing the
+    shared object in place covers both. Idempotent, and a no-op if the entry
+    changes shape. Pinned to aioamazondevices==16.8.1, re-check on library bumps.
+    """
+    for interface in DEVICE_CAPABILITIES.get("capabilities", []):
+        if interface.get("interface") == "Alexa.Mobile.Push":
+            interface.pop("configurations", None)
+            interface["version"] = "1.0"
 
 
 def is_directed_customer_id(value: Optional[str]) -> bool:
@@ -151,20 +182,23 @@ def login_error_message(e: BaseException) -> str:
     Amazon answers a rejected sign-in by simply not returning an authorization
     code — a wrong or expired 2-step code, a captcha, or an extra verification
     step all look like that — and the library turns it into
-    `KeyError: 'openid.oa2.authorization_code'`. Shown verbatim in app settings,
-    that reads like a crash, so users retry the same code over and over (one
-    report had five attempts in four minutes). Say what to do instead.
+    `CannotAuthenticate: Unable to extract authorization code from url: …`
+    (a bare `KeyError` up to 16.3.0). Shown verbatim in app settings, that
+    reads like a crash, so users retry the same code over and over (one report
+    had five attempts in four minutes). Say what to do instead.
 
     A sign-in that never resolved a hostname is the other one worth naming: it
     surfaces as `CannotConnect: Connection error during GET`, which two testers
     reported verbatim while hunting a problem that was never in the app.
     """
-    if isinstance(e, KeyError) and AUTH_CODE_PARAM in str(e):
+    if isinstance(e, CannotAuthenticate) and AUTH_CODE_MISSING in str(e):
         return (
             "Amazon did not complete the sign-in. Check the 2-step verification code "
             "and try again — if it keeps failing, open the Amazon app or website once "
             "to clear any extra verification step."
         )
+    if isinstance(e, MissingCountryError):
+        return MISSING_COUNTRY_MESSAGE
     return unresolved_host_message(e) or f"{type(e).__name__}: {e}"
 
 
@@ -310,6 +344,8 @@ class AlexaService:
         # serial -> deviceAccountId, skimmed off the raw device-list response
         # (see _harvest_device_account_ids).
         self._device_account_ids: dict[str, str] = {}
+        # serial -> when it was first seen without a media session.
+        self._media_missing_since: dict[str, float] = {}
         self._push_task: Optional[asyncio.Task] = None
         # Single mutex for everything that builds/tears down the session or
         # restarts the push channel (connect, recover, stop). Prevents two
@@ -444,7 +480,7 @@ class AlexaService:
         # is the very failure someone pins a server to escape, so the setting
         # would be useless to anyone not already signed in. The pin is applied
         # immediately afterwards by _apply_pinned_site().
-        # Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
+        # Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
         original = login._domain_refresh_auth_cookies
 
         async def keep_default_domain() -> None:
@@ -481,6 +517,7 @@ class AlexaService:
         # Fresh session — let recovery have its full budget of attempts again.
         self._recovery_attempts = 0
         self._last_recovery_ts = 0.0
+        _opt_out_of_smart_home_push()
         self._session = aiohttp.ClientSession(
             connector=self._shared_connector(),
             connector_owner=False,
@@ -707,6 +744,7 @@ class AlexaService:
             self._api = None
             self._devices = {}
             self._device_account_ids = {}
+            self._media_missing_since = {}
             # Next session gets a fresh baseline instead of inheriting this one's.
             self._csrf_present = None
 
@@ -740,7 +778,7 @@ class AlexaService:
 
         Mirrors aioamazondevices' private AmazonLogin._refresh_auth_cookies (no
         public equivalent), but guards on the refresh result before clearing the
-        jar. Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
+        jar. Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
 
         The cookie-unpacking loop below is adapted from aioamazondevices
         (https://github.com/chemelli74/aioamazondevices), Copyright the
@@ -783,7 +821,7 @@ class AlexaService:
         One line per transition is enough to see that in a diagnostic report
         (present at login, cleared at the renewal, and either re-acquired on the
         next heartbeat or not) without writing a line every five minutes forever.
-        Reads a private attribute; pinned to aioamazondevices==16.3.0.
+        Reads a private attribute; pinned to aioamazondevices==16.8.1.
         """
         if self._api is None:
             return
@@ -896,7 +934,7 @@ class AlexaService:
         with no I/O, so applying the other marketplace and putting the current
         one back is the cheapest way to ask "what locale does amazon.fr mean?"
         without duplicating the library's langcodes handling.
-        Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
+        Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
         """
         if self._api is None:
             return None
@@ -937,7 +975,7 @@ class AlexaService:
         switch of `AmazonLogin._domain_refresh_auth_cookies()` — calling that
         directly would re-mint cookies on *every* connect, because its switch
         branch fires for any non-default domain. Pinned to
-        aioamazondevices==16.3.0 — re-check on library bumps.
+        aioamazondevices==16.8.1 — re-check on library bumps.
         """
         if self._api is None:
             return
@@ -962,7 +1000,7 @@ class AlexaService:
         new host into stored `login_data` so the next start begins there.
         Mirrors the switch in `AmazonLogin._domain_refresh_auth_cookies()` rather
         than calling it, because that one re-mints cookies on *every* connect for
-        any non-default domain. Pinned to aioamazondevices==16.3.0.
+        any non-default domain. Pinned to aioamazondevices==16.8.1.
 
         `locale_site` keeps the spoken locale on a *different* marketplace than
         the traffic — see _apply_pinned_site. Omit it and the locale follows the
@@ -1119,8 +1157,15 @@ class AlexaService:
         type, cluster members and the account customer id. Those extra per-device
         calls are also slow enough on multi-device accounts to exceed Homey's 30s
         pairing timeout (or hang on a throttled comms call), so we skip them.
+
+        Since aioamazondevices 16.3.1 this list is built from the GraphQL
+        `listEndpoints` query, enriched with `api/devices-v2/device`. That costs
+        three requests instead of one. An Echo that GraphQL doesn't list is
+        dropped (speaker groups excepted), and an empty GraphQL answer on the
+        first load raises CannotRetrieveData("No device endpoint data received").
+        devices-v2 is still fetched, so _harvest_device_account_ids still sees it.
         """
-        await self._api._device_handler.get_base_devices()
+        await self._api._device_handler.update_devices()
         self._devices = self._api._device_handler.devices
         self._seed_default_device()
         return self._devices
@@ -1151,7 +1196,7 @@ class AlexaService:
 
         We never call set_default_device(), so there is no persisted choice to
         respect: first online single device is the whole policy.
-        Pinned to aioamazondevices==16.3.0 — re-check on library bumps.
+        Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
         """
         if self._api is None or not hasattr(self._api, "_default_device_serial"):
             return
@@ -1201,7 +1246,13 @@ class AlexaService:
             if self._api is None:
                 return
             await self.refresh_session(refresh_cookies=refresh_cookies)
-        await self._api.login.login_mode_stored_data()
+        # A stored login only does useful work here while the account customer
+        # id is missing, i.e. after a stored login that failed partway: the
+        # id lookup is the one thing it did up to 16.3.0. Since 16.4.0 every call
+        # also re-registers the device capabilities (another token refresh and
+        # a PUT), so don't repeat it every heartbeat.
+        if not self._api._session_state_data.account_customer_id:
+            await self._api.login.login_mode_stored_data()
         await self._api.sync_media_state()
         await self.sync_dnd()
         await self.ensure_push_channel()
@@ -1218,8 +1269,39 @@ class AlexaService:
     async def _handle_media(self, payload: dict[str, Any]) -> None:
         if self.on_media is None:
             return
-        for serial, media in payload.items():
-            await self.on_media(serial, media)
+        in_session = {s for s, m in payload.items() if m is not None and m.player_state}
+        for serial in in_session:
+            self._media_missing_since.pop(serial, None)
+            await self.on_media(serial, payload[serial])
+        await self._clear_ended_media_sessions(in_session)
+
+    async def _clear_ended_media_sessions(self, in_session: set[str]) -> None:
+        """Send None to every device whose media session has ended.
+
+        Amazon reports no "stopped" state. When playback ends the device drops
+        out of the media-session list, and when nothing is playing anywhere the
+        library emits an empty payload. Forwarding only the sessions it reports
+        left the last PLAYING on the tile for good, and across restarts too,
+        because Homey keeps capability values. Support log c5021fa8: an Echo Spot
+        showed "playing" and Pause got a 404 because nothing was playing.
+
+        The list also drops a device briefly around track changes, so a device
+        counts as stopped only after it has been missing for MEDIA_IDLE_GRACE_S
+        across two observations (a push event or the heartbeat). A speaker-group
+        member is never cleared while its group is in session: App._fanout
+        mirrors the group's state onto the members, and Amazon may list only the
+        group.
+        """
+        now = time.monotonic()
+        for serial, device in self._devices.items():
+            if not device.media_player_supported or serial in in_session:
+                continue
+            if any(parent in in_session for parent in device.parent_clusters):
+                self._media_missing_since.pop(serial, None)
+                continue
+            since = self._media_missing_since.setdefault(serial, now)
+            if now - since >= MEDIA_IDLE_GRACE_S:
+                await self.on_media(serial, None)
 
     async def _handle_dnd(self, payload: dict[str, bool]) -> None:
         # The library sends its whole cached {serial: enabled} map on every
@@ -1327,14 +1409,14 @@ class AlexaService:
         what the old alexa-remote2 based app sent. The library only builds text
         announcements, so take its node, flip the type and queue it the way
         `send_message` queues its own. Private API — pinned to
-        aioamazondevices==16.3.0, re-check on library bumps.
+        aioamazondevices==16.8.1, re-check on library bumps.
         """
         handler = self._api._sequence_handler
-        node = handler._build_operation_node(device, AmazonSequenceType.Announcement, ssml)
-        content = node["operationPayload"]["content"][0]
-        content["speak"]["type"] = "ssml"
-        # Echo Show screens print the body; give them the words, not the markup.
-        content["display"]["body"] = text
+        # Echo Show screens print the display body: show the words, not the markup.
+        node = handler._build_operation_node(
+            device, AmazonSequenceType.Announcement, ssml, display_text=text
+        )
+        node["operationPayload"]["content"][0]["speak"]["type"] = "ssml"
         await handler._enqueue_sequence(
             AmazonSequenceNode(
                 message_type=AmazonSequenceType.Announcement,
@@ -1391,7 +1473,7 @@ class AlexaService:
         Falls back to `call_routine()` when no serial is given or the device is
         unknown to this session (see _seed_default_device for what that picks).
         Uses the library's private sequence handler — the only single-device
-        entry point for a routine. Pinned to aioamazondevices==16.3.0 — re-check
+        entry point for a routine. Pinned to aioamazondevices==16.8.1 — re-check
         on library bumps.
         """
         if self._api is None:
@@ -1424,7 +1506,19 @@ class AlexaService:
 
     @heal_stale_session
     async def playback(self, serial: str, action: str) -> None:
-        await self._api.send_media_command(self._device(serial), _PLAYBACK[action])
+        try:
+            await self._api.send_media_command(self._device(serial), _PLAYBACK[action])
+        except CannotRetrieveData as e:
+            # Amazon answers 404 when the device has no media session at all.
+            if not str(e).endswith(HTTPStatus.NOT_FOUND.phrase):
+                raise
+            if action == "pause":
+                # Pausing wants nothing to be playing, and that is already true.
+                # Raising here meant a stale "playing" tile could not be cleared
+                # from Homey (support log c5021fa8).
+                self._log(f"pause: nothing playing on {serial}, treating it as paused")
+                return
+            raise RuntimeError("Nothing is playing or paused on this device") from e
 
     @heal_stale_session
     async def set_do_not_disturb(self, serial: str, enabled: bool) -> None:

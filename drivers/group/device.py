@@ -84,8 +84,13 @@ class GroupDevice(device.Device):
             await self.set_capability_value("volume_set", value)
 
     async def apply_media(self, media) -> None:
-        # Ignore no-data updates (player_state=None) to avoid clobbering known state.
-        if media.player_state is None:
+        # None means the media session has ended (debounced, see
+        # AlexaService._clear_ended_media_sessions).
+        if media is None:
+            if self.has_capability("speaker_playing") and self.get_capability_value(
+                "speaker_playing"
+            ):
+                await self.set_capability_value("speaker_playing", False)
             return
         if self.has_capability("speaker_playing"):
             await self.set_capability_value("speaker_playing", media.player_state == "PLAYING")

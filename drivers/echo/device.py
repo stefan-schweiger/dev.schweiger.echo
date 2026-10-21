@@ -219,9 +219,13 @@ class EchoDevice(device.Device):
             await cast("EchoDriver", self.driver).trigger_screen(self, bool(value))
 
     async def apply_media(self, media) -> None:
-        # The now-playing endpoint flaps to player_state=None (no data) between real
-        # updates; ignore those so we don't clobber a known PLAYING/PAUSED state.
-        if media.player_state is None:
+        # None means the media session has ended (debounced, see
+        # AlexaService._clear_ended_media_sessions).
+        if media is None:
+            if self.has_capability("speaker_playing") and self.get_capability_value(
+                "speaker_playing"
+            ):
+                await self.set_capability_value("speaker_playing", False)
             return
         if self.has_capability("speaker_playing"):
             await self.set_capability_value("speaker_playing", media.player_state == "PLAYING")

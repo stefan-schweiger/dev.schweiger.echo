@@ -11,9 +11,9 @@ short-lived secrets at DEBUG (the bearer access token inside request headers, th
 CSRF cookie value). We redact those here before anything leaves the app; the
 library already scrubs its structured JSON dumps (see utils.scrub_fields).
 
-Pinned to aioamazondevices==16.3.0 — re-check the redaction patterns on library
+Pinned to aioamazondevices==16.8.1 — re-check the redaction patterns on library
 bumps against the sensitive DEBUG lines in http_wrapper.session_request / login.
-As of 16.3.0 the library's own scrub list covers `Authorization`,
+As of 16.8.1 the library's own scrub list covers `Authorization`,
 `anti-csrftoken-a2z` and `secureSessionToken`, so the header patterns below are
 backstops; the raw `CSRF cookie value: <…>` line is still logged unscrubbed.
 """
