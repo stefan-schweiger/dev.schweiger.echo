@@ -1,0 +1,30 @@
+{
+  "title": {
+    "en": "Stop playback on all devices",
+    "de": "Wiedergabe auf allen Geräten stoppen",
+    "fr": "Arrêter la lecture sur tous les appareils",
+    "nl": "Afspelen op alle apparaten stoppen",
+    "it": "Interrompi la riproduzione su tutti i dispositivi",
+    "es": "Detener la reproducción en todos los dispositivos",
+    "sv": "Stoppa uppspelningen på alla enheter",
+    "no": "Stopp avspillingen på alle enheter",
+    "da": "Stop afspilningen på alle enheder",
+    "pl": "Zatrzymaj odtwarzanie na wszystkich urządzeniach",
+    "ru": "Остановить воспроизведение на всех устройствах",
+    "ko": "모든 기기에서 재생 중지"
+  },
+  "hint": {
+    "en": "Stops music, radio and other audio on every Alexa device on your Amazon account, including the ones not added to Homey.",
+    "de": "Stoppt Musik, Radio und andere Wiedergaben auf allen Alexa-Geräten deines Amazon-Kontos, auch auf denen, die nicht zu Homey hinzugefügt sind.",
+    "fr": "Arrête la musique, la radio et les autres contenus audio sur tous les appareils Alexa de votre compte Amazon, y compris ceux qui ne sont pas ajoutés à Homey.",
+    "nl": "Stopt muziek, radio en andere audio op alle Alexa-apparaten van je Amazon-account, ook op apparaten die niet aan Homey zijn toegevoegd.",
+    "it": "Interrompe musica, radio e altri contenuti audio su tutti i dispositivi Alexa del tuo account Amazon, anche quelli non aggiunti a Homey.",
+    "es": "Detiene la música, la radio y otro audio en todos los dispositivos Alexa de tu cuenta de Amazon, incluidos los que no se han añadido a Homey.",
+    "sv": "Stoppar musik, radio och annat ljud på alla Alexa-enheter på ditt Amazon-konto, även de som inte har lagts till i Homey.",
+    "no": "Stopper musikk, radio og annen lyd på alle Alexa-enheter på Amazon-kontoen din, også de som ikke er lagt til i Homey.",
+    "da": "Stopper musik, radio og anden lyd på alle Alexa-enheder på din Amazon-konto, også dem, der ikke er føjet til Homey.",
+    "pl": "Zatrzymuje muzykę, radio i inny dźwięk na wszystkich urządzeniach Alexa na Twoim koncie Amazon, także na tych, które nie zostały dodane do Homey.",
+    "ru": "Останавливает музыку, радио и другое аудио на всех устройствах Alexa в вашем аккаунте Amazon, включая те, что не добавлены в Homey.",
+    "ko": "Amazon 계정의 모든 Alexa 기기에서 음악, 라디오 및 기타 오디오를 중지합니다. Homey에 추가하지 않은 기기도 포함됩니다."
+  }
+}

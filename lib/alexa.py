@@ -117,12 +117,14 @@ LIST_TYPE_NAMES = {"SHOP": "Shopping List", "TODO": "To-do List"}
 ROUTINES_LOG_INTERVAL_S = 60
 ROUTINES_PROBE_INTERVAL_S = 5 * 60
 
-# Amazon intermittently answers the email+password POST with a captcha /
+# Amazon intermittently answers the password POST with a captcha /
 # interstitial / rate-limit page instead of the OTP form; the library surfaces
-# that as CannotAuthenticate with this exact message. It's transient, so we retry
-# the interactive login once (see start_interactive). Genuine bad credentials
-# raise a *different* message and must not be retried.
-OTP_PAGE_MISSING = "MFA OTP code not found on login page"
+# that as CannotAuthenticate("Unexpected login page '<title>', expected OTP code
+# entry") — "MFA OTP code not found on login page" up to 16.8.1. It's transient,
+# so we retry the interactive login once (see start_interactive). Genuine bad
+# credentials raise a *different* message (since 16.9.1 usually Amazon's own
+# error text) and must not be retried.
+OTP_PAGE_MISSING = "expected OTP code entry"
 
 # Amazon hands out the account id in two forms and they are NOT interchangeable:
 #   - "amzn1.account.AGP2HK…"  obfuscated id, returned by /auth/register
@@ -146,7 +148,12 @@ _PLAYBACK = {
     "pause": AmazonMediaControls.Pause,
     "next": AmazonMediaControls.Next,
     "previous": AmazonMediaControls.Previous,
+    "stop": AmazonMediaControls.Stop,
 }
+
+# What alexa-remote2's "deviceStopAll" targets: Amazon fills in every device on
+# the account itself.
+ALL_DEVICES_TARGET = {"deviceSerialNumber": "ALEXA_ALL_DSN", "deviceType": "ALEXA_ALL_DEVICE_TYPE"}
 
 
 def _opt_out_of_smart_home_push() -> None:
@@ -163,7 +170,7 @@ def _opt_out_of_smart_home_push() -> None:
     The library sends this dict unchanged on every capability registration
     (interactive sign-in and, since 16.4.0, every stored login), so changing the
     shared object in place covers both. Idempotent, and a no-op if the entry
-    changes shape. Pinned to aioamazondevices==16.8.1, re-check on library bumps.
+    changes shape. Pinned to aioamazondevices==16.9.2, re-check on library bumps.
     """
     for interface in DEVICE_CAPABILITIES.get("capabilities", []):
         if interface.get("interface") == "Alexa.Mobile.Push":
@@ -480,7 +487,7 @@ class AlexaService:
         # is the very failure someone pins a server to escape, so the setting
         # would be useless to anyone not already signed in. The pin is applied
         # immediately afterwards by _apply_pinned_site().
-        # Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
+        # Pinned to aioamazondevices==16.9.2 — re-check on library bumps.
         original = login._domain_refresh_auth_cookies
 
         async def keep_default_domain() -> None:
@@ -778,7 +785,7 @@ class AlexaService:
 
         Mirrors aioamazondevices' private AmazonLogin._refresh_auth_cookies (no
         public equivalent), but guards on the refresh result before clearing the
-        jar. Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
+        jar. Pinned to aioamazondevices==16.9.2 — re-check on library bumps.
 
         The cookie-unpacking loop below is adapted from aioamazondevices
         (https://github.com/chemelli74/aioamazondevices), Copyright the
@@ -821,7 +828,7 @@ class AlexaService:
         One line per transition is enough to see that in a diagnostic report
         (present at login, cleared at the renewal, and either re-acquired on the
         next heartbeat or not) without writing a line every five minutes forever.
-        Reads a private attribute; pinned to aioamazondevices==16.8.1.
+        Reads a private attribute; pinned to aioamazondevices==16.9.2.
         """
         if self._api is None:
             return
@@ -934,7 +941,7 @@ class AlexaService:
         with no I/O, so applying the other marketplace and putting the current
         one back is the cheapest way to ask "what locale does amazon.fr mean?"
         without duplicating the library's langcodes handling.
-        Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
+        Pinned to aioamazondevices==16.9.2 — re-check on library bumps.
         """
         if self._api is None:
             return None
@@ -975,7 +982,7 @@ class AlexaService:
         switch of `AmazonLogin._domain_refresh_auth_cookies()` — calling that
         directly would re-mint cookies on *every* connect, because its switch
         branch fires for any non-default domain. Pinned to
-        aioamazondevices==16.8.1 — re-check on library bumps.
+        aioamazondevices==16.9.2 — re-check on library bumps.
         """
         if self._api is None:
             return
@@ -1000,7 +1007,7 @@ class AlexaService:
         new host into stored `login_data` so the next start begins there.
         Mirrors the switch in `AmazonLogin._domain_refresh_auth_cookies()` rather
         than calling it, because that one re-mints cookies on *every* connect for
-        any non-default domain. Pinned to aioamazondevices==16.8.1.
+        any non-default domain. Pinned to aioamazondevices==16.9.2.
 
         `locale_site` keeps the spoken locale on a *different* marketplace than
         the traffic — see _apply_pinned_site. Omit it and the locale follows the
@@ -1196,7 +1203,7 @@ class AlexaService:
 
         We never call set_default_device(), so there is no persisted choice to
         respect: first online single device is the whole policy.
-        Pinned to aioamazondevices==16.8.1 — re-check on library bumps.
+        Pinned to aioamazondevices==16.9.2 — re-check on library bumps.
         """
         if self._api is None or not hasattr(self._api, "_default_device_serial"):
             return
@@ -1409,7 +1416,7 @@ class AlexaService:
         what the old alexa-remote2 based app sent. The library only builds text
         announcements, so take its node, flip the type and queue it the way
         `send_message` queues its own. Private API — pinned to
-        aioamazondevices==16.8.1, re-check on library bumps.
+        aioamazondevices==16.9.2, re-check on library bumps.
         """
         handler = self._api._sequence_handler
         # Echo Show screens print the display body: show the words, not the markup.
@@ -1449,6 +1456,44 @@ class AlexaService:
         await self._api.call_alexa_sound(self._device(serial), sound_id)
 
     @heal_stale_session
+    async def play_music(self, serial: str, search_phrase: str, provider_id: str) -> None:
+        await self._api.call_alexa_music(self._device(serial), search_phrase, provider_id)
+
+    @heal_stale_session
+    async def stop_all(self) -> None:
+        """Stop playback on every device on the account, in one command.
+
+        The library only builds a Stop for one device, so take its node and
+        retarget it at ALL_DEVICES_TARGET, with the same payload alexa-remote2
+        sends for "deviceStopAll" (no device or locale of its own,
+        `isAssociatedDevice: false`), which is what the old app's "stop all" card
+        sends. Private API, pinned to aioamazondevices==16.9.2. Re-check it on
+        library bumps.
+        """
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
+        # The node is built from any device. Its own target is replaced below.
+        device = next(iter(self._devices.values()), None)
+        if device is None:
+            raise RuntimeError("No devices found on this Amazon account")
+        handler = self._api._sequence_handler
+        node = handler._build_operation_node(device, AmazonSequenceType.Stop)
+        payload = node["operationPayload"]
+        for key in ("deviceType", "deviceSerialNumber", "locale"):
+            payload.pop(key, None)
+        payload["devices"] = [ALL_DEVICES_TARGET]
+        payload["isAssociatedDevice"] = False
+        await handler._enqueue_sequence(
+            AmazonSequenceNode(
+                message_type=AmazonSequenceType.Stop,
+                message_body=None,
+                music_provider_id=None,
+                device=device,
+                operation_node=node,
+            )
+        )
+
+    @heal_stale_session
     async def run_routine(self, routine_name: str, serial: Optional[str] = None) -> None:
         """Run a routine, from `serial` when the flow card named a device.
 
@@ -1473,7 +1518,7 @@ class AlexaService:
         Falls back to `call_routine()` when no serial is given or the device is
         unknown to this session (see _seed_default_device for what that picks).
         Uses the library's private sequence handler — the only single-device
-        entry point for a routine. Pinned to aioamazondevices==16.8.1 — re-check
+        entry point for a routine. Pinned to aioamazondevices==16.9.2 — re-check
         on library bumps.
         """
         if self._api is None:
@@ -1687,6 +1732,21 @@ class AlexaService:
             ({"id": sound_id, "name": name} for sound_id, name in SOUNDS_LIST.items()),
             key=lambda s: s["name"],
         )
+
+    async def list_music_providers(self) -> list[dict]:
+        """Music services linked to the account, the default one first.
+
+        The library fetches these once per session and checks the card's choice
+        against the same list, so a service linked later shows up after the app
+        reconnects.
+        """
+        if self._api is None:
+            return []
+        providers = sorted(
+            (await self._api.music_providers).values(),
+            key=lambda p: (not p.default_provider, p.provider_name.lower()),
+        )
+        return [{"id": p.provider_id, "name": p.provider_name} for p in providers]
 
     async def list_routines(self) -> list[str]:
         """Enabled routine names, re-fetched on every call (Flow autocomplete).

@@ -115,5 +115,8 @@
   },
   "2.3.1": {
     "en": "Fixes an Echo or speaker group staying on \"playing\" after the music stopped, and Pause no longer fails when nothing is playing. If your Amazon account has no country set, the app now tells you how to fix it. Also updates the Amazon library the app talks through."
+  },
+  "2.4.0": {
+    "en": "Fixes signing in to Amazon: Amazon changed its sign-in page this week, and connecting failed with 'InvalidUrlClientError'. New flow cards: 'Play music' plays a song, artist, album, playlist or station on a music service linked in your Alexa app, 'Stop playback' stops the audio on one Echo, and 'Stop playback on all devices' stops it on every Alexa device on your account, including the ones not added to Homey."
   }
 }

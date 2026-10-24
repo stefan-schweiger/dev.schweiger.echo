@@ -9,6 +9,7 @@ The name "Echo" and all related trademarks and logos are the property of Amazon.
 ## Features
 
 - **Device control** - Play/pause, skip tracks, adjust volume, and view now-playing info for Echo speakers and displays
+- **Music** - Play a song, artist, playlist or station on a linked music service, and stop playback on one Echo or on every device at once
 - **Text-to-speech** - Say messages, make announcements, or whisper to your Echo devices
 - **Say / Announce with Voice** - Speak, whisper or announce in a specific Amazon Polly voice and language via SSML, including languages Alexa doesn't speak itself (e.g. Swedish, Danish, Polish) as an announcement
 - **Voice commands** - Send voice commands to Echo devices remotely (same as speaking to the device)
@@ -39,6 +40,9 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 | Announce with Voice | Announce using any Amazon Polly voice, e.g. Swedish; silent during Do Not Disturb |
 | Tell Command | Execute a voice command on the device |
 | Play Sound | Play a notification sound (with autocomplete) |
+| Play music | Play a song, artist, album, playlist or station on a music service linked in the Alexa app (with autocomplete) |
+| Stop playback | Stop music, radio and other audio on the device |
+| Stop playback on all devices | Stop audio on every Alexa device on the account, including ones not added to Homey |
 | Run Routine | Execute a saved Alexa routine (with autocomplete) |
 | Do Not Disturb | Turn Do Not Disturb on or off |
 | Screen | Turn the display on or off (screen devices) |
@@ -70,9 +74,10 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 > **Screen devices** (Echo Show, Echo Spot, Echo Dot with clock) also get `Display`, `Dim` and
 > `Adaptive Brightness` capabilities. These appear only on devices that actually report a screen.
 
-> **Which devices can a card pick?** The list cards and the error trigger are app-wide and take no
-> device. Every other card is limited to individual Echo devices, and the screen cards only offer
-> devices that report a screen.
+> **Which devices can a card pick?** The list cards, Stop playback on all devices and the error
+> trigger are app-wide and take no device. Every other card is limited to individual Echo devices.
+> The screen cards only offer devices that report a screen, and Play music and Stop playback only
+> devices that play audio.
 >
 > **Speaker groups are deliberately not selectable.** A multi-room group is only a media target as
 > far as Amazon is concerned: playback, volume and now-playing work on it, but speech (Say Message,

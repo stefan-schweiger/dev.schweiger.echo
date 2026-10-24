@@ -11,7 +11,7 @@ A Homey app (**Python** Apps SDK v3, runs on Homey's CPython 3.14 runtime) that 
 ## Tech stack
 
 - **Language/runtime:** Python (Homey runs CPython **3.14**); `"runtime": "python"`, `"pythonVersion": "3.14"` in the manifest.
-- **Core dependency:** `aioamazondevices==16.8.1` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
+- **Core dependency:** `aioamazondevices==16.9.2` (pulls `aiohttp`, `httpx[http2]`, `orjson`, `anyio`, `beautifulsoup4`, `h2`, `yarl`, …).
 - **Platform:** Homey Apps SDK v3. **Requires Homey firmware >= 13.0.0** (Python apps).
 - **No test framework.** Validate with `homey app run` against a real Homey + Amazon account.
 - Type-checking (optional, local): `homey-stubs` + pyright.
@@ -301,7 +301,7 @@ Background and the full investigation record live in [`docs/dns-investigation.md
 ### SSML
 `call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.
 
-**Speak only renders some Polly voices.** `Alexa.Speak` honours `<voice>` only for the voices in Amazon's "Supported Amazon Polly voices" table (`SPEAK_VOICES` in `lib/constants.py`) — in any language, e.g. Brian speaks English on a German account. Any other voice is **dropped without an error** and the text is read in the account's own voice, so "Swedish - Astrid" sounded like the German Alexa. The same SSML sent as an **AlexaAnnouncement with `speak.type: "ssml"`** does render them (verified on-device: Astrid, Mads; no chime was heard), which is what the old alexa-remote2 app sent for every voice. Hence two cards rather than one card choosing per voice: **Say with Voice** only offers `SPEAK_VOICES` and keeps speaking during Do Not Disturb (verified on-device: Speak talks, the announcement doesn't), **Announce with Voice** offers every voice and is silenced by it. A Homey dropdown can't clear an autocomplete value already picked, so a single card with a Say/Announce choice could still end up as "Say + Astrid". Flows saved before the split that hold a non-Speak voice on Say with Voice are announced instead (`say_with_voice`), so they keep working. The library only builds *text* announcements, so `_announce_ssml` takes its node and flips the type (private API, pinned to aioamazondevices==16.8.1), passing the plain text as `display_text` so Echo Show screens don't print the markup. The content `locale` made no difference on-device (account locale, the voice's locale and alexa-remote2's hard-coded `de-DE` all worked).
+**Speak only renders some Polly voices.** `Alexa.Speak` honours `<voice>` only for the voices in Amazon's "Supported Amazon Polly voices" table (`SPEAK_VOICES` in `lib/constants.py`) — in any language, e.g. Brian speaks English on a German account. Any other voice is **dropped without an error** and the text is read in the account's own voice, so "Swedish - Astrid" sounded like the German Alexa. The same SSML sent as an **AlexaAnnouncement with `speak.type: "ssml"`** does render them (verified on-device: Astrid, Mads; no chime was heard), which is what the old alexa-remote2 app sent for every voice. Hence two cards rather than one card choosing per voice: **Say with Voice** only offers `SPEAK_VOICES` and keeps speaking during Do Not Disturb (verified on-device: Speak talks, the announcement doesn't), **Announce with Voice** offers every voice and is silenced by it. A Homey dropdown can't clear an autocomplete value already picked, so a single card with a Say/Announce choice could still end up as "Say + Astrid". Flows saved before the split that hold a non-Speak voice on Say with Voice are announced instead (`say_with_voice`), so they keep working. The library only builds *text* announcements, so `_announce_ssml` takes its node and flips the type (private API, pinned to aioamazondevices==16.9.2), passing the plain text as `display_text` so Echo Show screens don't print the markup. The content `locale` made no difference on-device (account locale, the voice's locale and alexa-remote2's hard-coded `de-DE` all worked).
 
 ### Routines *are* device specific
 
@@ -332,6 +332,27 @@ the fact that a `WHA` serial isn't accepted by the sequence endpoint at all. Up 
 `default_device` was a lazy property with a first-online-device fallback and none of this was
 needed; 15.1.0 turned it into persisted state (`settings.json` via `set_default_device()`,
 which this app never calls) and moved the fallback out of our path.
+
+### Music and Stop
+
+**Play music** (`play-music`) is the library's public `call_alexa_music(device, phrase,
+provider_id)`, with the provider picked from `api.music_providers`: the services linked in the
+Alexa app that support `Alexa.Music.PlaySearchPhrase`, the default first. The library fetches
+that list once per session and `call_alexa_music` checks the card's choice against the same
+list, so a service linked later only appears after the app reconnects.
+
+**Stop playback** (`stop-playback`) is `send_media_command(device, AmazonMediaControls.Stop)`,
+which the library turns into an `Alexa.DeviceControls.Stop` sequence per cluster member
+(stopping both halves of a stereo pair is harmless, unlike a routine running twice). Both
+cards carry `$filter: capabilities=speaker_playing`, i.e. devices with `AUDIO_CONTROLS`.
+
+**Stop playback on all devices** (`stop-playback-all`, app level) sends one Stop node
+targeted at `ALEXA_ALL_DSN` / `ALEXA_ALL_DEVICE_TYPE` (`ALL_DEVICES_TARGET`), the payload
+alexa-remote2 sends for `deviceStopAll`: no device or locale of its own,
+`isAssociatedDevice: false`. Amazon expands the placeholder itself, so Echos that aren't
+paired in Homey stop too. `AlexaService.stop_all()` builds the library's single-device Stop
+node and retargets it (private API, pinned to aioamazondevices==16.9.2). Not yet verified
+on-device: whether either Stop also silences a ringing alarm or timer.
 
 ## Driver capabilities
 
@@ -368,6 +389,35 @@ released; leaving them in is not harmful (each degrades to a no-op) but they're 
 and they monkey-patch private internals.
 
 Nothing is pending right now.
+
+**What changed under us in 16.8.1 → 16.9.2** (no workaround was dropped):
+- **Amazon's new sign-in pages** (from ~2026-10-20, rolled out per account): the OAuth URL
+  now answers with an identifier-first page whose form posts to the *relative* `/ax/claim?…`,
+  asking for the e-mail only; the password follows on a page of its own. Up to 16.8.1 the
+  library posted e-mail and password to that relative URL in one go and aiohttp refused it
+  (`InvalidUrlClientError: /ax/claim?…`, upstream #1188, issue #47 here). 16.9.1 (upstream
+  PR #1194) resolves form actions against the page URL and submits each field on the page
+  that asks for it.
+- **The "no OTP page" message changed** to `Unexpected login page '<title>', expected OTP
+  code entry`, so `OTP_PAGE_MISSING` now matches that; the page title is what to look for in
+  a report. A rejected e-mail, password or code now usually raises Amazon's own error text
+  instead of `Unable to extract authorization code`.
+- **Verified on-device (2026-10-24, amazon.de account with TOTP):** the e-mail is posted to
+  `/ax/claim`. The password page and the classic `auth-mfa-otpcode` page both post to
+  `/ap/signin`, so the expected `/ap/maplanding` 404 is tolerated as before. That matches
+  upstream's tests. The fresh sign-in completed in ~11 s.
+- **Not every account may get those pages.** One amazon.de report on #1188 saw a new
+  `unified-otp-form` instead (`otpCode` without the `auth-mfa-otpcode` id, posting to
+  `/ax/claim/auth`). With that page, 16.9.2 fails with `Unexpected login page '…'`. Because the
+  maplanding 404 is only tolerated after a chain that started at `/ap/signin`
+  (`_ignore_ap_signin_error`), it could also end in `CannotRetrieveData: Request failed: Not
+  Found`. If a report shows either error, that's the cause.
+- **Why not 16.9.3+:** 16.9.3 makes `update_devices()` raise `CannotRetrieveData` when the
+  GraphQL features query errors, where it used to build the devices without features. This
+  app doesn't use features, so that would only add a way for `refresh_devices` (sign-in,
+  pairing) to fail. 16.9.4 also adds a DND/media resync after HTTP/2 reconnects. That is
+  additive and arrives through the same `on_dnd_event`/`on_media_state_event` signals. Take
+  both on purpose in a later bump.
 
 **What changed under us in 16.3.1 → 16.8.1** (no workaround was dropped):
 - **Do not run 16.3.0 with aiohttp ≥ 3.14.4.** aiohttp 3.14.4 (2026-10-05) changed cookie

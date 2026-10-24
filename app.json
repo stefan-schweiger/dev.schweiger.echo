@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "dev.schweiger.echo",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "compatibility": ">=13.0.0",
   "sdk": 3,
   "runtime": "python",
@@ -94,7 +94,7 @@
   },
   "homeyCommunityTopicId": 120365,
   "pythonPackages": [
-    "aioamazondevices==16.8.1"
+    "aioamazondevices==16.9.2"
   ],
   "flow": {
     "triggers": [
@@ -699,6 +699,37 @@
           }
         ],
         "id": "remove-list-item"
+      },
+      {
+        "title": {
+          "en": "Stop playback on all devices",
+          "de": "Wiedergabe auf allen Geräten stoppen",
+          "fr": "Arrêter la lecture sur tous les appareils",
+          "nl": "Afspelen op alle apparaten stoppen",
+          "it": "Interrompi la riproduzione su tutti i dispositivi",
+          "es": "Detener la reproducción en todos los dispositivos",
+          "sv": "Stoppa uppspelningen på alla enheter",
+          "no": "Stopp avspillingen på alle enheter",
+          "da": "Stop afspilningen på alle enheder",
+          "pl": "Zatrzymaj odtwarzanie na wszystkich urządzeniach",
+          "ru": "Остановить воспроизведение на всех устройствах",
+          "ko": "모든 기기에서 재생 중지"
+        },
+        "hint": {
+          "en": "Stops music, radio and other audio on every Alexa device on your Amazon account, including the ones not added to Homey.",
+          "de": "Stoppt Musik, Radio und andere Wiedergaben auf allen Alexa-Geräten deines Amazon-Kontos, auch auf denen, die nicht zu Homey hinzugefügt sind.",
+          "fr": "Arrête la musique, la radio et les autres contenus audio sur tous les appareils Alexa de votre compte Amazon, y compris ceux qui ne sont pas ajoutés à Homey.",
+          "nl": "Stopt muziek, radio en andere audio op alle Alexa-apparaten van je Amazon-account, ook op apparaten die niet aan Homey zijn toegevoegd.",
+          "it": "Interrompe musica, radio e altri contenuti audio su tutti i dispositivi Alexa del tuo account Amazon, anche quelli non aggiunti a Homey.",
+          "es": "Detiene la música, la radio y otro audio en todos los dispositivos Alexa de tu cuenta de Amazon, incluidos los que no se han añadido a Homey.",
+          "sv": "Stoppar musik, radio och annat ljud på alla Alexa-enheter på ditt Amazon-konto, även de som inte har lagts till i Homey.",
+          "no": "Stopper musikk, radio og annen lyd på alle Alexa-enheter på Amazon-kontoen din, også de som ikke er lagt til i Homey.",
+          "da": "Stopper musik, radio og anden lyd på alle Alexa-enheder på din Amazon-konto, også dem, der ikke er føjet til Homey.",
+          "pl": "Zatrzymuje muzykę, radio i inny dźwięk na wszystkich urządzeniach Alexa na Twoim koncie Amazon, także na tych, które nie zostały dodane do Homey.",
+          "ru": "Останавливает музыку, радио и другое аудио на всех устройствах Alexa в вашем аккаунте Amazon, включая те, что не добавлены в Homey.",
+          "ko": "Amazon 계정의 모든 Alexa 기기에서 음악, 라디오 및 기타 오디오를 중지합니다. Homey에 추가하지 않은 기기도 포함됩니다."
+        },
+        "id": "stop-playback-all"
       },
       {
         "id": "set-screen",
@@ -1456,6 +1487,132 @@
               "ru": "Звук",
               "ko": "소리"
             }
+          }
+        ]
+      },
+      {
+        "id": "play-music",
+        "title": {
+          "en": "Play music",
+          "de": "Musik abspielen",
+          "fr": "Lire de la musique",
+          "nl": "Muziek afspelen",
+          "it": "Riproduci musica",
+          "es": "Reproducir música",
+          "sv": "Spela musik",
+          "no": "Spill musikk",
+          "da": "Afspil musik",
+          "pl": "Odtwórz muzykę",
+          "ru": "Воспроизвести музыку",
+          "ko": "음악 재생"
+        },
+        "titleFormatted": {
+          "en": "Play [[search]] on [[provider]]",
+          "de": "Spiele [[search]] auf [[provider]]",
+          "fr": "Jouer [[search]] sur [[provider]]",
+          "nl": "Speel [[search]] op [[provider]]",
+          "it": "Riproduci [[search]] su [[provider]]",
+          "es": "Reproducir [[search]] en [[provider]]",
+          "sv": "Spela [[search]] på [[provider]]",
+          "no": "Spill [[search]] på [[provider]]",
+          "da": "Afspil [[search]] på [[provider]]",
+          "pl": "Odtwórz [[search]] w [[provider]]",
+          "ru": "Воспроизвести [[search]] в [[provider]]",
+          "ko": "[[provider]]에서 [[search]] 재생"
+        },
+        "hint": {
+          "en": "Plays a song, artist, album, playlist or station, as if you asked Alexa for it. The list shows the music services linked in your Alexa app.",
+          "de": "Spielt einen Song, Künstler, ein Album, eine Playlist oder einen Sender, als hättest du Alexa darum gebeten. Die Liste zeigt die Musikdienste, die in deiner Alexa-App verknüpft sind.",
+          "fr": "Lit un titre, un artiste, un album, une playlist ou une station, comme si vous le demandiez à Alexa. La liste affiche les services de musique associés dans votre application Alexa.",
+          "nl": "Speelt een nummer, artiest, album, afspeellijst of zender af, alsof je het aan Alexa vroeg. De lijst toont de muziekdiensten die in je Alexa-app zijn gekoppeld.",
+          "it": "Riproduce un brano, un artista, un album, una playlist o una stazione, come se lo chiedessi ad Alexa. L'elenco mostra i servizi musicali collegati nella tua app Alexa.",
+          "es": "Reproduce una canción, un artista, un álbum, una lista o una emisora, como si se lo pidieras a Alexa. La lista muestra los servicios de música vinculados en tu app de Alexa.",
+          "sv": "Spelar en låt, artist, ett album, en spellista eller en station, som om du bad Alexa om det. Listan visar musiktjänsterna som är länkade i din Alexa-app.",
+          "no": "Spiller en sang, artist, et album, en spilleliste eller en stasjon, som om du ba Alexa om det. Listen viser musikktjenestene som er koblet til i Alexa-appen.",
+          "da": "Afspiller en sang, kunstner, et album, en playliste eller en station, som hvis du bad Alexa om det. Listen viser de musiktjenester, der er tilknyttet i din Alexa-app.",
+          "pl": "Odtwarza utwór, wykonawcę, album, playlistę lub stację, tak jakbyś poprosił o to Alexę. Lista pokazuje serwisy muzyczne połączone w aplikacji Alexa.",
+          "ru": "Воспроизводит песню, исполнителя, альбом, плейлист или станцию — как если бы вы попросили Alexa. В списке — музыкальные сервисы, подключённые в приложении Alexa.",
+          "ko": "Alexa에게 요청한 것처럼 노래, 아티스트, 앨범, 재생목록 또는 방송국을 재생합니다. 목록에는 Alexa 앱에 연결된 음악 서비스가 표시됩니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=speaker_playing"
+          },
+          {
+            "type": "text",
+            "name": "search",
+            "placeholder": {
+              "en": "Song, artist or playlist",
+              "de": "Song, Künstler oder Playlist",
+              "fr": "Titre, artiste ou playlist",
+              "nl": "Nummer, artiest of afspeellijst",
+              "it": "Brano, artista o playlist",
+              "es": "Canción, artista o lista",
+              "sv": "Låt, artist eller spellista",
+              "no": "Sang, artist eller spilleliste",
+              "da": "Sang, kunstner eller playliste",
+              "pl": "Utwór, wykonawca lub playlista",
+              "ru": "Песня, исполнитель или плейлист",
+              "ko": "노래, 아티스트 또는 재생목록"
+            }
+          },
+          {
+            "type": "autocomplete",
+            "name": "provider",
+            "placeholder": {
+              "en": "Music service",
+              "de": "Musikdienst",
+              "fr": "Service de musique",
+              "nl": "Muziekdienst",
+              "it": "Servizio musicale",
+              "es": "Servicio de música",
+              "sv": "Musiktjänst",
+              "no": "Musikktjeneste",
+              "da": "Musiktjeneste",
+              "pl": "Serwis muzyczny",
+              "ru": "Музыкальный сервис",
+              "ko": "음악 서비스"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-playback",
+        "title": {
+          "en": "Stop playback",
+          "de": "Wiedergabe stoppen",
+          "fr": "Arrêter la lecture",
+          "nl": "Afspelen stoppen",
+          "it": "Interrompi la riproduzione",
+          "es": "Detener la reproducción",
+          "sv": "Stoppa uppspelningen",
+          "no": "Stopp avspillingen",
+          "da": "Stop afspilningen",
+          "pl": "Zatrzymaj odtwarzanie",
+          "ru": "Остановить воспроизведение",
+          "ko": "재생 중지"
+        },
+        "hint": {
+          "en": "Stops music, radio and other audio on this device.",
+          "de": "Stoppt Musik, Radio und andere Wiedergaben auf diesem Gerät.",
+          "fr": "Arrête la musique, la radio et les autres contenus audio sur cet appareil.",
+          "nl": "Stopt muziek, radio en andere audio op dit apparaat.",
+          "it": "Interrompe musica, radio e altri contenuti audio su questo dispositivo.",
+          "es": "Detiene la música, la radio y otro audio en este dispositivo.",
+          "sv": "Stoppar musik, radio och annat ljud på den här enheten.",
+          "no": "Stopper musikk, radio og annen lyd på denne enheten.",
+          "da": "Stopper musik, radio og anden lyd på denne enhed.",
+          "pl": "Zatrzymuje muzykę, radio i inny dźwięk na tym urządzeniu.",
+          "ru": "Останавливает музыку, радио и другое аудио на этом устройстве.",
+          "ko": "이 기기에서 음악, 라디오 및 기타 오디오를 중지합니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo&capabilities=speaker_playing"
           }
         ]
       },

@@ -64,6 +64,27 @@ class EchoDriver(driver.Driver):
         async def on_sound(args: Mapping[str, Any], **kwargs) -> None:
             await self._alexa.play_sound(_serial(args), args["sound"]["data"]["id"])
 
+        async def autocomplete_music_provider(query: str, **kwargs) -> list[dict]:
+            q = (query or "").lower()
+            try:
+                providers = await self._alexa.list_music_providers()
+            except Exception as e:  # noqa: BLE001 - Homey can only show a list
+                self.error(f"Music provider autocomplete failed: {type(e).__name__}: {e}")
+                return []
+            return [
+                {"name": p["name"], "data": {"id": p["id"]}}
+                for p in providers
+                if q in p["name"].lower()
+            ]
+
+        async def on_music(args: Mapping[str, Any], **kwargs) -> None:
+            await self._alexa.play_music(
+                _serial(args), args["search"], args["provider"]["data"]["id"]
+            )
+
+        async def on_stop(args: Mapping[str, Any], **kwargs) -> None:
+            await self._alexa.playback(_serial(args), "stop")
+
         async def autocomplete_routine(query: str, **kwargs) -> list[dict]:
             q = (query or "").lower()
             try:
@@ -134,6 +155,10 @@ class EchoDriver(driver.Driver):
         sound = flow.get_action_card("play-sound")
         sound.register_argument_autocomplete_listener("sound", autocomplete_sound)
         sound.register_run_listener(_explained(on_sound))
+        music = flow.get_action_card("play-music")
+        music.register_argument_autocomplete_listener("provider", autocomplete_music_provider)
+        music.register_run_listener(_explained(on_music))
+        flow.get_action_card("stop-playback").register_run_listener(_explained(on_stop))
         routine = flow.get_action_card("run-routine")
         routine.register_argument_autocomplete_listener("routine", autocomplete_routine)
         routine.register_run_listener(_explained(on_routine))

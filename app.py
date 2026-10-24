@@ -51,6 +51,10 @@ class App(app.App):
         self.homey.flow.get_action_card("complete-list-item").register_run_listener(
             explained(self._complete_list_item)
         )
+        # Reaches every device on the account, not one Echo, so this is app level too.
+        self.homey.flow.get_action_card("stop-playback-all").register_run_listener(
+            explained(self._stop_all)
+        )
 
         login_data = self.homey.settings.get("login_data")
         email = self.homey.settings.get("email")
@@ -343,6 +347,9 @@ class App(app.App):
             # without the Flow having to know the id another way.
             "list_id": list_id,
         }
+
+    async def _stop_all(self, args, **kwargs) -> None:
+        await self.alexa.stop_all()
 
     async def _remove_list_item(self, args, **kwargs) -> None:
         await self.alexa.remove_list_item(args["list"], args["item"])
