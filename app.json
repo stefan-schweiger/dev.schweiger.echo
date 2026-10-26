@@ -94,7 +94,7 @@
   },
   "homeyCommunityTopicId": 120365,
   "pythonPackages": [
-    "aioamazondevices==16.9.2"
+    "aioamazondevices==17.2.3"
   ],
   "flow": {
     "triggers": [
