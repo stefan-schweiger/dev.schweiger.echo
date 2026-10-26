@@ -118,5 +118,8 @@
   },
   "2.4.0": {
     "en": "Fixes signing in to Amazon: Amazon changed its sign-in page this week, and connecting failed with 'InvalidUrlClientError'. New flow cards: 'Play music' plays a song, artist, album, playlist or station on a music service linked in your Alexa app, 'Stop playback' stops the audio on one Echo, and 'Stop playback on all devices' stops it on every Alexa device on your account, including the ones not added to Homey."
+  },
+  "2.5.0": {
+    "en": "New flow cards for alarms: 'Turn an alarm on or off' switches one of your Echo's alarms. For days like public holidays, 'An alarm is set for today/tomorrow', 'Get the alarms for a day' (their times and name as tags) and 'Skip the alarms on a day' work together: a repeating alarm skips only that day and stays on for the days after. Also updates the Amazon library the app talks through: after a dropped connection, Do Not Disturb, music and volume now catch up straight away."
   }
 }
