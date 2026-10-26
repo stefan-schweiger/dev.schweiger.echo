@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Non connesso ad Amazon. Controlla la connessione nelle impostazioni dell'app."
+  },
+  "alarms": {
+    "next": "Prossimo squillo: __date__",
+    "off": "Disattivata"
   }
 }

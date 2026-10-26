@@ -32,6 +32,9 @@ class App(app.App):
         self.alexa = AlexaService(self.log)
         # "" / missing = Auto (let Amazon's own /api/welcome decide).
         self.alexa.pinned_site = self.homey.settings.get("amazon_site") or None
+        # Alarm times are the Echo's wall-clock time; "today" is the Homey's.
+        self.alexa.timezone = self.homey.clock.get_timezone()
+        self.homey.clock.on_timezone_change(self._on_timezone_change)
         self.alexa.on_state_change = self._on_state_change
         self.alexa.on_volume = self._on_volume
         self.alexa.on_media = self._on_media
@@ -289,6 +292,9 @@ class App(app.App):
             enabled = statuses.get(device.get_data()["id"])
             if enabled is not None:
                 await device.apply_dnd(enabled)
+
+    def _on_timezone_change(self, timezone: str) -> None:
+        self.alexa.timezone = timezone
 
     async def _on_state_change(self, state: str, reason: Optional[str]) -> None:
         if state in ("connecting", "reconnecting"):

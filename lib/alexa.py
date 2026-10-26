@@ -14,14 +14,17 @@ import json
 import socket
 import ssl
 import time
+from datetime import datetime, timedelta
 from http import HTTPMethod, HTTPStatus
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 from xml.sax.saxutils import escape as escape_xml
+from zoneinfo import ZoneInfo
 
 import aiohttp
 import certifi
 from aiohttp.resolver import ThreadedResolver
+from dateutil.rrule import DAILY, rrule, rrulestr
 import httpx
 from yarl import URL
 from aioamazondevices.api import AmazonEchoApi
@@ -36,8 +39,17 @@ from aioamazondevices.const.http import (
     DEFAULT_SITE,
     REFRESH_ACCESS_TOKEN,
     REFRESH_AUTH_COOKIES,
+    REQUEST_AGENT,
     URI_BEHAVIORS_AUTOMATIONS,
     URI_DEVICES,
+    URI_NOTIFICATIONS,
+)
+from aioamazondevices.const.schedules import (
+    COUNTRY_GROUPS,
+    NOTIFICATION_ALARM,
+    NOTIFICATION_MUSIC_ALARM,
+    RECURRING_PATTERNS,
+    WEEKEND_EXCEPTIONS,
 )
 from aioamazondevices.const.sounds import SOUNDS_LIST
 from aioamazondevices.structures import (
@@ -72,6 +84,19 @@ GROUP_FAMILY = "WHA"
 # Per-device settings (screen power, brightness, …). Not exposed by
 # aioamazondevices; keyed on deviceAccountId, not the serial number.
 URI_DEVICE_SETTINGS = "api/v1/devices/{account_id}/settings/{name}"
+
+# Alarms. The library reads Amazon's notification list but keeps only each
+# device's next alarm and can't change one, so both happen here. Changes go to
+# Amazon's alarms API on the regional Alexa API host that /api/endpoints names,
+# with the bearer token instead of the website cookies. See "Alarms" in AGENTS.md.
+URI_ENDPOINTS = "api/endpoints"
+URI_ALARM = "v1/alerts/alarms/{alarm_id}/{action}"
+ALARM_TYPES = {NOTIFICATION_ALARM, NOTIFICATION_MUSIC_ALARM}
+# A snoozed alarm is still on: it rings again in a few minutes.
+ALARM_ON_STATUSES = {"ON", "SNOOZED"}
+# The library raises CannotRetrieveData for every status except 200, so a 204
+# from the alarms API would look like a failure.
+SUCCESS_PHRASES = tuple(status.phrase for status in HTTPStatus if status.is_success)
 
 # How long a device must be missing from Amazon's media-session list before it
 # counts as stopped — see _clear_ended_media_sessions.
@@ -216,6 +241,31 @@ def _voice_ssml(message: str, voice_id: str, mode: str) -> str:
     if mode == "whisper":
         content = f'<amazon:effect name="whispered">{content}</amazon:effect>'
     return f'<speak><voice name="{voice}"><lang xml:lang="{lang}">{content}</lang></voice></speak>'
+
+
+def _alarm_on(alarm: dict) -> bool:
+    return alarm.get("status") in ALARM_ON_STATUSES
+
+
+def _alarm_label(alarm: dict) -> str:
+    return alarm.get("alarmLabel") or alarm.get("reminderLabel") or ""
+
+
+def _alarm_repeats(alarm: dict) -> bool:
+    return bool(
+        alarm.get("recurringPattern")
+        or (alarm.get("rRuleData") or {}).get("recurrenceRules")
+    )
+
+
+def _rings(rules: list[rrule], start: datetime, end: datetime) -> list[datetime]:
+    """Every ring in [start, end), earliest first."""
+    return sorted({at for rule in rules for at in rule.between(start, end, inc=True) if at < end})
+
+
+def _next_ring(rules: list[rrule], after: datetime) -> Optional[datetime]:
+    upcoming = [at for rule in rules if (at := rule.after(after, inc=True)) is not None]
+    return min(upcoming, default=None)
 
 
 def heal_stale_session(method):
@@ -370,6 +420,13 @@ class AlexaService:
         # Marketplace the user pinned in app settings ("amazon.fr"), or None for
         # "Auto" — see _apply_pinned_site / _heal_domain_pin.
         self.pinned_site: Optional[str] = None
+        # The Homey's timezone, kept current by app.py. Alarm times are wall-clock
+        # times on the Echo (see _local_now).
+        self.timezone = "UTC"
+        # Regional Alexa API, looked up once per session (see _resolve_alexa_api_url).
+        self._alexa_api_url: Optional[URL] = None
+        # alarm id -> the ring this app last skipped (see skip_alarms).
+        self._skipped_rings: dict[str, datetime] = {}
         self._recover_tasks: set[asyncio.Task] = set()
         self.state = "disconnected"
         self.last_error: Optional[str] = None
@@ -751,6 +808,7 @@ class AlexaService:
             self._api = None
             self._devices = {}
             self._device_account_ids = {}
+            self._alexa_api_url = None
             self._media_missing_since = {}
             # Next session gets a fresh baseline instead of inheriting this one's.
             self._csrf_present = None
@@ -1617,6 +1675,278 @@ class AlexaService:
             input_data={"value": json.dumps(value)},
             json_data=True,
         )
+
+    # --- alarms ------------------------------------------------------------
+    # aioamazondevices reads Amazon's notification list but keeps only each
+    # device's next alarm, and it can't change one. So the list is read here, and
+    # alarms are changed through Amazon's alarms API: the activate/cancel calls
+    # alexa-remote2 and ioBroker.alexa2 have used since 2022. See "Alarms" in
+    # AGENTS.md.
+    def _local_now(self) -> datetime:
+        """Now as wall-clock time in the Homey's timezone, without tzinfo.
+
+        Amazon gives alarm times as wall-clock times on the Echo, so "today" and
+        "tomorrow" come from the Homey's timezone, never from the process clock's
+        (Homey apps are not guaranteed to run in local time). tzdata ships with
+        python-dateutil, a library dependency.
+        """
+        return datetime.now(ZoneInfo(self.timezone)).replace(tzinfo=None)
+
+    def _day_window(self, day: str) -> tuple[datetime, datetime]:
+        """[start, end) of "today" or "tomorrow". Today starts now: a ring that is
+        already over doesn't count."""
+        now = self._local_now()
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if day == "today":
+            return now, midnight + timedelta(days=1)
+        return midnight + timedelta(days=1), midnight + timedelta(days=2)
+
+    def _recurring_patterns(self) -> dict[str, str]:
+        """Amazon's recurrence names as RFC 5545 rules, with the account's weekend.
+
+        The same table and country adjustment as the library's
+        _parse_next_occurrence.
+        """
+        patterns = RECURRING_PATTERNS.copy()
+        country = self._api._session_state_data.country_code.upper()
+        for group, countries in COUNTRY_GROUPS.items():
+            if country in countries:
+                patterns |= WEEKEND_EXCEPTIONS[group]
+                break
+        return patterns
+
+    def _alarm_rules(self, alarm: dict) -> list[rrule]:
+        """When `alarm` rings, as rules over the Echo's wall-clock time.
+
+        Reads the schedule the way aioamazondevices does (notification.py
+        _parse_next_occurrence): Amazon's recurrence names or the RFC 5545 rules
+        in rRuleData, from originalDate at originalTime. A one-time alarm is a
+        rule with a single ring. The library's version only answers "next ring
+        after the process clock"; rules answer any window, from the Homey's "now".
+        """
+        try:
+            hour, minute = (int(part) for part in alarm["originalTime"].split(":")[:2])
+            first_day = (
+                datetime.fromisoformat(alarm["originalDate"])
+                if alarm.get("originalDate")
+                else None
+            )
+        except (KeyError, AttributeError, ValueError):
+            return []
+        recurrences = list((alarm.get("rRuleData") or {}).get("recurrenceRules") or [])
+        if alarm.get("recurringPattern"):
+            recurrences.append(alarm["recurringPattern"])
+        if not recurrences:
+            if first_day is None:
+                return []
+            return [rrule(DAILY, count=1, dtstart=first_day.replace(hour=hour, minute=minute))]
+
+        dtstart = first_day or self._local_now().replace(hour=0, minute=0, second=0, microsecond=0)
+        patterns = self._recurring_patterns()
+        rules: list[rrule] = []
+        for recurrence in recurrences:
+            rule = patterns.get(recurrence, recurrence).removesuffix(";")
+            if "BYHOUR=" not in rule:
+                rule += f";BYHOUR={hour}"
+            if "BYMINUTE=" not in rule:
+                rule += f";BYMINUTE={minute}"
+            try:
+                rules.append(rrulestr(rule, dtstart=dtstart))
+            except ValueError:
+                # Without this an alarm would silently drop out of "has an
+                # alarm tomorrow", with nothing in a report to say why.
+                self._log(f"alarms: ignoring unknown recurrence '{recurrence}'")
+        return rules
+
+    async def _alarms(self, serial: str) -> list[dict]:
+        """The Echo's alarms, on and off, as Amazon's notification list has them."""
+        if self._api is None:
+            raise RuntimeError("Not connected to Amazon")
+        _, raw_resp = await self._api._http_wrapper.session_request(
+            method=HTTPMethod.GET,
+            url=URL.joinpath(self._api._session_state_data.alexa_website_url, URI_NOTIFICATIONS),
+        )
+        payload = await self._api._http_wrapper.response_to_json(
+            raw_resp, "alarms", content_type=None
+        )
+        return [
+            notification
+            for notification in payload.get("notifications") or []
+            if notification.get("type") in ALARM_TYPES
+            and notification.get("deviceSerialNumber") == serial
+            and notification.get("notificationIndex")
+        ]
+
+    async def _resolve_alexa_api_url(self) -> URL:
+        """The regional Alexa API (https://api.eu.amazonalexa.com, …), once per session.
+
+        Amazon's /api/endpoints names it, which is how alexa-remote2 finds it.
+        The account's AVS home region would point there too, but the library
+        notes that it is not always right (http2.py _check_avs_site).
+        """
+        if self._alexa_api_url is None:
+            _, raw_resp = await self._api._http_wrapper.session_request(
+                method=HTTPMethod.GET,
+                url=URL.joinpath(self._api._session_state_data.alexa_website_url, URI_ENDPOINTS),
+            )
+            payload = await self._api._http_wrapper.response_to_json(
+                raw_resp, "endpoints", content_type=None
+            )
+            if not payload.get("alexaApiUrl"):
+                raise RuntimeError("Amazon did not name the server that handles alarms")
+            self._alexa_api_url = URL(payload["alexaApiUrl"])
+            self._log(f"alarms: Alexa API at {self._alexa_api_url.host}")
+        return self._alexa_api_url
+
+    async def _alarm_request(self, alarm_id: str, action: str, body: Optional[dict] = None) -> None:
+        """PUT one change to Amazon's alarms API.
+
+        Authenticated with the bearer token, which the heartbeat refreshes, not
+        the website cookies. Any 2xx answer counts as success (see
+        SUCCESS_PHRASES).
+        """
+        url = URL.joinpath(
+            await self._resolve_alexa_api_url(),
+            URI_ALARM.format(alarm_id=alarm_id, action=action),
+        )
+        token = self._api._session_state_data.login_stored_data.get(REFRESH_ACCESS_TOKEN)
+        try:
+            await self._api._http_wrapper.session_request(
+                method=HTTPMethod.PUT,
+                url=url,
+                input_data=body,
+                json_data=body is not None,
+                extended_headers={
+                    "Authorization": f"Bearer {token}",
+                    "User-Agent": REQUEST_AGENT["Amazon"],
+                },
+            )
+        except CannotRetrieveData as e:
+            if not str(e).endswith(SUCCESS_PHRASES):
+                raise
+        self._log(f"alarm {alarm_id}: {action}")
+
+    def _activation(self, alarm: dict) -> dict:
+        """Body for turning `alarm` on: its next ring and its tone.
+
+        The same shape alexa-remote2 sends. A one-time alarm whose day has
+        passed is set for its time today, or tomorrow if that's over too.
+        """
+        now = self._local_now()
+        at = _next_ring(self._alarm_rules(alarm), now)
+        if at is None:
+            hour, minute = (int(part) for part in alarm["originalTime"].split(":")[:2])
+            at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if at <= now:
+                at += timedelta(days=1)
+        body: dict[str, Any] = {
+            "trigger": {"scheduledTime": at.strftime("%Y-%m-%dT%H:%M:%S")},
+            "extensions": [],
+        }
+        if alarm.get("musicAlarmId"):
+            body["assets"] = [{"type": "TONE", "assetId": f"MUSIC-{alarm['musicAlarmId']}"}]
+        elif (alarm.get("sound") or {}).get("id"):
+            body["assets"] = [{"type": "TONE", "assetId": alarm["sound"]["id"]}]
+        return body
+
+    @heal_stale_session
+    async def list_alarms(self, serial: str) -> list[dict]:
+        """Every alarm on the Echo, by time of day, for the Flow picker."""
+        now = self._local_now()
+        alarms = [
+            {
+                "id": alarm["notificationIndex"],
+                "time": (alarm.get("originalTime") or "")[:5],
+                "label": _alarm_label(alarm),
+                "on": _alarm_on(alarm),
+                "next": _next_ring(self._alarm_rules(alarm), now) if _alarm_on(alarm) else None,
+            }
+            for alarm in await self._alarms(serial)
+        ]
+        return sorted(alarms, key=lambda a: (a["time"], a["label"].lower()))
+
+    @heal_stale_session
+    async def alarms_on(self, serial: str, day: str) -> list[dict]:
+        """The rings on `day`, earliest first, as {"time": "06:30", "label": …}.
+
+        Only alarms that are on, and not a ring this app skipped. Today counts
+        only rings still to come.
+        """
+        start, end = self._day_window(day)
+        rings = []
+        for alarm in await self._alarms(serial):
+            if not _alarm_on(alarm):
+                continue
+            skipped = self._skipped_rings.get(alarm["notificationIndex"])
+            rings += [
+                (at, _alarm_label(alarm))
+                for at in _rings(self._alarm_rules(alarm), start, end)
+                if at != skipped
+            ]
+        return [{"time": f"{at:%H:%M}", "label": label} for at, label in sorted(rings)]
+
+    @heal_stale_session
+    async def set_alarm_on(self, serial: str, alarm_id: str, on: bool) -> None:
+        alarm = next(
+            (a for a in await self._alarms(serial) if a["notificationIndex"] == alarm_id),
+            None,
+        )
+        if alarm is None:
+            raise RuntimeError("This alarm no longer exists on the Echo. Pick it again on the card.")
+        if _alarm_on(alarm) == on:
+            self._log(f"alarm {alarm_id}: already {'on' if on else 'off'}")
+            return
+        if on:
+            await self._alarm_request(alarm_id, "activate", self._activation(alarm))
+        else:
+            await self._alarm_request(alarm_id, "cancel")
+        self._skipped_rings.pop(alarm_id, None)
+
+    @heal_stale_session
+    async def skip_alarms(self, serial: str, day: str) -> int:
+        """Skip every ring on `day` and return how many were skipped.
+
+        A repeating alarm skips just that ring (Amazon's nextOccurrence/cancel)
+        and stays on; a one-time alarm is turned off. Amazon can only skip an
+        alarm's *next* ring, so an alarm that rings again later today can't skip
+        tomorrow's yet. Those are reported instead of skipping the wrong ring.
+
+        Skipping is remembered per alarm, because asking Amazon twice would skip
+        the ring after the one already skipped: a Flow that runs twice would
+        silence the next working day's alarm too.
+        """
+        start, end = self._day_window(day)
+        now = self._local_now()
+        skipped, too_early = 0, []
+        for alarm in await self._alarms(serial):
+            alarm_id = alarm["notificationIndex"]
+            rules = self._alarm_rules(alarm)
+            rings = _rings(rules, start, end)
+            if not _alarm_on(alarm) or not rings:
+                continue
+            name = f"{rings[0]:%H:%M} {_alarm_label(alarm)}".strip()
+            already = self._skipped_rings.get(alarm_id)
+            if already == rings[0]:
+                self._log(f"alarm {alarm_id}: the {rings[0]:%H:%M} ring {day} is already skipped")
+                continue
+            upcoming = _next_ring(rules, now)
+            if upcoming is not None and upcoming == already:
+                upcoming = _next_ring(rules, already + timedelta(minutes=1))
+            if upcoming is not None and upcoming < rings[0]:
+                too_early.append(name)
+                continue
+            await self._alarm_request(
+                alarm_id, "nextOccurrence/cancel" if _alarm_repeats(alarm) else "cancel"
+            )
+            self._skipped_rings[alarm_id] = rings[0]
+            skipped += 1
+        self._log(f"alarms: skipped {skipped} ring(s) {day} on {serial}")
+        if too_early:
+            raise RuntimeError(
+                f"Alexa can only skip an alarm's next ring, and {', '.join(too_early)} "
+                "rings again later today. Skip tomorrow's ring after that one."
+            )
+        return skipped
 
     # --- diagnostics -----------------------------------------------------
     def _log_account_context(self) -> None:

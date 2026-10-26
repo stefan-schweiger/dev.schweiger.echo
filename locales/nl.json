@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Niet verbonden met Amazon. Controleer uw verbinding in de app-instellingen."
+  },
+  "alarms": {
+    "next": "Volgende keer: __date__",
+    "off": "Uit"
   }
 }

@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Non connecté à Amazon. Veuillez vérifier votre connexion dans les paramètres de l'application."
+  },
+  "alarms": {
+    "next": "Prochaine sonnerie : __date__",
+    "off": "Désactivée"
   }
 }

@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Not connected to Amazon. Please check your connection in the app settings."
+  },
+  "alarms": {
+    "next": "Next: __date__",
+    "off": "Off"
   }
 }

@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Amazon에 연결되어 있지 않습니다. 앱 설정에서 연결을 확인하세요."
+  },
+  "alarms": {
+    "next": "다음 알람: __date__",
+    "off": "꺼짐"
   }
 }

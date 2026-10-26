@@ -43,7 +43,7 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 |------|---------|
 | `app.py` | App lifecycle; deferred auto-connect from stored session; routes push events to devices (group media events fan out to cluster members; volume does not); periodic `sync` heartbeat; web-api methods; `error` flow trigger. Exports `homey_export = App`. |
 | `api.py` | Web-API endpoints (`connect`/`status`/`disconnect`/`reset`); names match the manifest `api` map. `homey` is injected at call time — do **not** `from homey import Homey`. |
-| `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
+| `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), alarms (read, on/off, skip), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
 | `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
 | `lib/diagnostics.py` | Opt-in bridge from the library's Python logger into Homey's app log (redacts bearer/CSRF values). Toggled from app settings; see **Diagnostics & support reports**. |
 | `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say/Announce with Voice") and `SPEAK_VOICES` (the subset Alexa.Speak renders). |
@@ -353,6 +353,63 @@ alexa-remote2 sends for `deviceStopAll`: no device or locale of its own,
 paired in Homey stop too. `AlexaService.stop_all()` builds the library's single-device Stop
 node and retargets it (private API, pinned to aioamazondevices==16.9.2). Not yet verified
 on-device: whether either Stop also silences a ringing alarm or timer.
+
+### Alarms
+
+Four Echo cards: **Turn an alarm on or off** (`set-alarm-state`, picks from that Echo's alarms),
+**An alarm is set for [today/tomorrow]** (`alarm-is-set`), **Get the alarms for [day]**
+(`get-alarms`; tokens `count`, `time` and `label` of the first ring, `times`) and **Skip the
+alarms [day]** (`skip-alarms`). The last three are for "public holiday tomorrow → ask → skip"
+flows. The holiday check and the question come from other apps.
+
+**Reading.** The library fetches `GET alexa.amazon.<tld>/api/notifications` but keeps only each
+device's next alarm, computed from the process clock. `AlexaService._alarms()` reads the same
+list itself (types `Alarm`/`MusicAlarm`, the card's serial). `_alarm_rules()` turns a schedule
+into dateutil rules the way the library's `_parse_next_occurrence` does: Amazon's recurrence
+names from `RECURRING_PATTERNS` with the account country's weekend, `rRuleData.recurrenceRules`,
+from `originalDate` at `originalTime`. Those times are the Echo's wall clock, so "now" comes from
+the Homey's timezone (`AlexaService.timezone`, kept current by `app.py`; `tzdata` ships with
+`python-dateutil`), never from the process clock's. "Today" only counts rings still to come.
+`ON` and `SNOOZED` count as on.
+
+**Writing** goes to Amazon's alarms API, the AVS "Alarms REST API". Amazon's doc page for it is
+gone; the reference is alexa-remote2's `changeNotification`/`cancelNotification`, which
+ioBroker.alexa2 has used for its alarm switches since 2022:
+
+```
+PUT <alexaApiUrl>/v1/alerts/alarms/<notificationIndex>/cancel                  # off
+PUT <alexaApiUrl>/v1/alerts/alarms/<notificationIndex>/activate                # on
+PUT <alexaApiUrl>/v1/alerts/alarms/<notificationIndex>/nextOccurrence/cancel   # skip the next ring
+    Authorization: Bearer <login_data["access_token"]>
+activate body: {"trigger": {"scheduledTime": "2026-10-27T06:30:00"}, "extensions": [],
+                "assets": [{"type": "TONE", "assetId": "<sound.id> or MUSIC-<musicAlarmId>"}]}
+```
+
+- `alexaApiUrl` (`https://api.eu.amazonalexa.com`, …) comes from `GET alexa.amazon.<tld>/api/endpoints`,
+  once per session. The AVS home region would point there too, but the library notes that it is
+  not always right (`http2.py` `_check_avs_site`).
+- The id in the path is the notification's `notificationIndex`, not its `id`.
+- The bearer token is the one the heartbeat refreshes every 5 minutes. A 401 goes through
+  `@heal_stale_session` like every other command.
+- The library raises `CannotRetrieveData` for any status but 200, so `_alarm_request` counts every
+  2xx as success (`SUCCESS_PHRASES`).
+- `activate` sends the alarm's real next ring. A one-time alarm whose day has passed is set for its
+  time today, or tomorrow if that's over too. alexa-remote2 sends `originalDate` plus one day,
+  which can still be in the past.
+
+**Skipping.** Amazon can only skip an alarm's *next* ring. So when the card asks for tomorrow and
+an alarm still rings later today, `skip_alarms` names it and refuses rather than skipping today's
+ring. A one-time alarm is cancelled outright. Every skip is remembered in `_skipped_rings` (alarm
+id → ring), because a second `nextOccurrence/cancel` would skip the ring *after* the skipped one:
+a Flow that fired twice would silence the next working day too. The same record keeps a skipped
+ring out of `alarms_on`, so "An alarm is set for tomorrow" turns false after a skip. It lives in
+memory and is lost on restart.
+
+**Not yet verified on-device (2026-10-26).** Whether `activate` accepts this body and answers 200
+or 204. Whether re-activating a repeating alarm keeps its recurrence. Whether a
+`nextOccurrence/cancel` shows in `/api/notifications` at all: if it does, `_skipped_rings` is
+redundant, and a skip made in the Alexa app could be read too. With debug logging on, the
+notification list is dumped as `JSON 'alarms' data`; compare it before and after a skip.
 
 ## Driver capabilities
 

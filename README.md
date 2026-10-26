@@ -44,6 +44,9 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 | Stop playback | Stop music, radio and other audio on the device |
 | Stop playback on all devices | Stop audio on every Alexa device on the account, including ones not added to Homey |
 | Run Routine | Execute a saved Alexa routine (with autocomplete) |
+| Turn an alarm on or off | Turn one of the Echo's alarms on or off (with autocomplete) |
+| Get the alarms for a day | The alarms that ring today or tomorrow; returns their number, the first one's time and label, and all times |
+| Skip the alarms on a day | Skip today's or tomorrow's alarms, e.g. on a public holiday. Repeating alarms skip only that ring and stay on |
 | Do Not Disturb | Turn Do Not Disturb on or off |
 | Screen | Turn the display on or off (screen devices) |
 | Adaptive Brightness | Turn adaptive brightness on or off (screen devices) |
@@ -67,9 +70,15 @@ Works with Amazon accounts across the supported marketplaces (US, UK, Canada, Au
 | Do Not Disturb is on | Test whether Do Not Disturb is active |
 | The screen is on | Test whether the display is on (screen devices) |
 | Adaptive Brightness is on | Test whether adaptive brightness is active (screen devices) |
+| An alarm is set | Test whether an alarm rings tomorrow, or later today |
 
 > **Lists** are Alexa's own shopping and to-do lists — the ones you fill by voice or in the Alexa app.
 > They are not the separate lists on the Amazon website.
+
+> **Alarms on a public holiday:** at 20:00, if tomorrow is a holiday (from a holiday app) and
+> "An alarm is set for tomorrow", get tomorrow's alarms and send yourself a question with their
+> time. When you answer yes, run "Skip the alarms tomorrow". Alexa can only skip an alarm's next
+> ring, so skip tomorrow's alarms after any alarm that still rings today.
 
 > **Screen devices** (Echo Show, Echo Spot, Echo Dot with clock) also get `Display`, `Dim` and
 > `Adaptive Brightness` capabilities. These appear only on devices that actually report a screen.

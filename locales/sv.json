@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Inte ansluten till Amazon. Kontrollera anslutningen i appens inställningar."
+  },
+  "alarms": {
+    "next": "Nästa ringning: __date__",
+    "off": "Av"
   }
 }

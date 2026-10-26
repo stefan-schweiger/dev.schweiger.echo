@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Nicht mit Amazon verbunden. Bitte überprüfe deine Verbindung in den App-Einstellungen."
+  },
+  "alarms": {
+    "next": "Nächstes Klingeln: __date__",
+    "off": "Aus"
   }
 }

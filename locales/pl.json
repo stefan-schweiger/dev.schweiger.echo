@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Brak połączenia z Amazon. Sprawdź połączenie w ustawieniach aplikacji."
+  },
+  "alarms": {
+    "next": "Następny dzwonek: __date__",
+    "off": "Wyłączony"
   }
 }

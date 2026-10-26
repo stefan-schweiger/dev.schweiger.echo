@@ -102,6 +102,58 @@ class EchoDriver(driver.Driver):
             # posted from. See AlexaService.run_routine.
             await self._alexa.run_routine(args["routine"]["data"]["name"], _serial(args))
 
+        async def autocomplete_alarm(query: str, **kwargs) -> list[dict]:
+            # Homey passes the card's other arguments along, so the picker can
+            # list just the chosen Echo's alarms.
+            device = kwargs.get("device")
+            if device is None:
+                return []
+            q = (query or "").lower()
+            try:
+                alarms = await self._alexa.list_alarms(device.get_data()["id"])
+            except Exception as e:  # noqa: BLE001 - Homey can only show a list
+                self.error(f"Alarm autocomplete failed: {type(e).__name__}: {e}")
+                return []
+            choices = []
+            for alarm in alarms:
+                name = f"{alarm['time']} {alarm['label']}".strip()
+                if q not in name.lower():
+                    continue
+                if alarm["next"] is not None:
+                    description = self.homey.translate("alarms.next", date=f"{alarm['next']:%Y-%m-%d}")
+                elif alarm["on"]:
+                    description = None
+                else:
+                    description = self.homey.translate("alarms.off")
+                choice = {"name": name, "data": {"id": alarm["id"]}}
+                if description:
+                    choice["description"] = description
+                choices.append(choice)
+            return choices
+
+        async def on_set_alarm(args: Mapping[str, Any], **kwargs) -> None:
+            await self._alexa.set_alarm_on(
+                _serial(args), args["alarm"]["data"]["id"], args["state"] == "on"
+            )
+
+        async def on_alarm_is_set(args: Mapping[str, Any], **kwargs) -> bool:
+            return bool(await self._alexa.alarms_on(_serial(args), args["day"]))
+
+        async def on_get_alarms(args: Mapping[str, Any], **kwargs) -> dict:
+            # The first alarm's time and label carry a notification such as
+            # "Alarm at 06:30 tomorrow, skip it?" without any scripting.
+            alarms = await self._alexa.alarms_on(_serial(args), args["day"])
+            first = alarms[0] if alarms else {"time": "", "label": ""}
+            return {
+                "count": len(alarms),
+                "time": first["time"],
+                "label": first["label"],
+                "times": ", ".join(a["time"] for a in alarms),
+            }
+
+        async def on_skip_alarms(args: Mapping[str, Any], **kwargs) -> None:
+            await self._alexa.skip_alarms(_serial(args), args["day"])
+
         async def on_set_dnd(args: Mapping[str, Any], **kwargs) -> None:
             await args["device"].set_dnd(args["state"] == "on")
 
@@ -162,6 +214,13 @@ class EchoDriver(driver.Driver):
         routine = flow.get_action_card("run-routine")
         routine.register_argument_autocomplete_listener("routine", autocomplete_routine)
         routine.register_run_listener(_explained(on_routine))
+        alarm = flow.get_action_card("set-alarm-state")
+        alarm.register_argument_autocomplete_listener("alarm", autocomplete_alarm)
+        alarm.register_run_listener(_explained(on_set_alarm))
+        # Unlike the other conditions this one asks Amazon, so it can fail in DNS too.
+        flow.get_condition_card("alarm-is-set").register_run_listener(_explained(on_alarm_is_set))
+        flow.get_action_card("get-alarms").register_run_listener(_explained(on_get_alarms))
+        flow.get_action_card("skip-alarms").register_run_listener(_explained(on_skip_alarms))
 
         self.log("EchoDriver has been initialized")
 

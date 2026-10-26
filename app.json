@@ -1671,6 +1671,417 @@
             }
           }
         ]
+      },
+      {
+        "id": "set-alarm-state",
+        "title": {
+          "en": "Turn an alarm on or off",
+          "de": "Wecker ein- oder ausschalten",
+          "fr": "Activer ou désactiver une alarme",
+          "nl": "Wekker in- of uitschakelen",
+          "it": "Attiva o disattiva una sveglia",
+          "es": "Activar o desactivar una alarma",
+          "sv": "Aktivera eller inaktivera ett alarm",
+          "no": "Aktiver eller deaktiver en alarm",
+          "da": "Aktivér eller deaktivér en alarm",
+          "pl": "Włącz lub wyłącz alarm",
+          "ru": "Включить или выключить будильник",
+          "ko": "알람 켜기/끄기"
+        },
+        "titleFormatted": {
+          "en": "[[state]] the alarm [[alarm]]",
+          "de": "Wecker [[alarm]] [[state]]",
+          "fr": "[[state]] l'alarme [[alarm]]",
+          "nl": "Wekker [[alarm]] [[state]]",
+          "it": "[[state]] la sveglia [[alarm]]",
+          "es": "[[state]] la alarma [[alarm]]",
+          "sv": "[[state]] alarmet [[alarm]]",
+          "no": "[[state]] alarmen [[alarm]]",
+          "da": "[[state]] alarmen [[alarm]]",
+          "pl": "[[state]] alarm [[alarm]]",
+          "ru": "[[state]] будильник [[alarm]]",
+          "ko": "알람 [[alarm]] [[state]]"
+        },
+        "hint": {
+          "en": "Pick one of this Echo's alarms. Turning one on sets it for its next ring.",
+          "de": "Wähle einen der Wecker dieses Echos. Beim Einschalten wird er für sein nächstes Klingeln gestellt.",
+          "fr": "Choisissez une des alarmes de cet Echo. L'activer la règle pour sa prochaine sonnerie.",
+          "nl": "Kies een van de wekkers van deze Echo. Inschakelen zet hem voor de volgende keer dat hij afgaat.",
+          "it": "Scegli una delle sveglie di questo Echo. Attivandola viene impostata per il suo prossimo squillo.",
+          "es": "Elige una de las alarmas de este Echo. Al activarla se programa para su próximo aviso.",
+          "sv": "Välj ett av den här Echons alarm. När det aktiveras ställs det för nästa ringning.",
+          "no": "Velg en av denne Echoens alarmer. Når den aktiveres, stilles den inn for neste ringing.",
+          "da": "Vælg en af denne Echos alarmer. Når den aktiveres, sættes den til næste ringning.",
+          "pl": "Wybierz jeden z alarmów tego Echo. Włączenie ustawia go na najbliższy dzwonek.",
+          "ru": "Выберите один из будильников этого Echo. При включении он ставится на ближайший звонок.",
+          "ko": "이 Echo의 알람 중 하나를 선택하세요. 켜면 다음 울림 시간으로 설정됩니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          },
+          {
+            "type": "autocomplete",
+            "name": "alarm",
+            "placeholder": {
+              "en": "Alarm",
+              "de": "Wecker",
+              "fr": "Alarme",
+              "nl": "Wekker",
+              "it": "Sveglia",
+              "es": "Alarma",
+              "sv": "Alarm",
+              "no": "Alarm",
+              "da": "Alarm",
+              "pl": "Alarm",
+              "ru": "Будильник",
+              "ko": "알람"
+            }
+          },
+          {
+            "type": "dropdown",
+            "name": "state",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "Turn on",
+                  "de": "einschalten",
+                  "fr": "Activer",
+                  "nl": "inschakelen",
+                  "it": "Attiva",
+                  "es": "Activar",
+                  "sv": "Aktivera",
+                  "no": "Aktiver",
+                  "da": "Aktivér",
+                  "pl": "Włącz",
+                  "ru": "Включить",
+                  "ko": "켜기"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Turn off",
+                  "de": "ausschalten",
+                  "fr": "Désactiver",
+                  "nl": "uitschakelen",
+                  "it": "Disattiva",
+                  "es": "Desactivar",
+                  "sv": "Inaktivera",
+                  "no": "Deaktiver",
+                  "da": "Deaktivér",
+                  "pl": "Wyłącz",
+                  "ru": "Выключить",
+                  "ko": "끄기"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "get-alarms",
+        "title": {
+          "en": "Get the alarms for a day",
+          "de": "Wecker eines Tages abrufen",
+          "fr": "Récupérer les alarmes d'un jour",
+          "nl": "Wekkers van een dag ophalen",
+          "it": "Ottieni le sveglie di un giorno",
+          "es": "Obtener las alarmas de un día",
+          "sv": "Hämta alarmen för en dag",
+          "no": "Hent alarmene for en dag",
+          "da": "Hent alarmerne for en dag",
+          "pl": "Pobierz alarmy na dany dzień",
+          "ru": "Получить будильники на день",
+          "ko": "하루의 알람 가져오기"
+        },
+        "titleFormatted": {
+          "en": "Get the alarms for [[day]]",
+          "de": "Rufe die Wecker für [[day]] ab",
+          "fr": "Récupérer les alarmes pour [[day]]",
+          "nl": "Haal de wekkers voor [[day]] op",
+          "it": "Ottieni le sveglie per [[day]]",
+          "es": "Obtener las alarmas para [[day]]",
+          "sv": "Hämta alarmen för [[day]]",
+          "no": "Hent alarmene for [[day]]",
+          "da": "Hent alarmerne til [[day]]",
+          "pl": "Pobierz alarmy na [[day]]",
+          "ru": "Получить будильники на [[day]]",
+          "ko": "[[day]] 알람 가져오기"
+        },
+        "hint": {
+          "en": "The alarms that ring that day, earliest first. Counts the same alarms as the condition 'An alarm is set'.",
+          "de": "Die Wecker, die an diesem Tag klingeln, der früheste zuerst. Zählt dieselben Wecker wie die Bedingung „Ein Wecker ist gestellt“.",
+          "fr": "Les alarmes qui sonnent ce jour-là, la plus tôt en premier. Compte les mêmes alarmes que la condition « Une alarme est réglée ».",
+          "nl": "De wekkers die die dag afgaan, de vroegste eerst. Telt dezelfde wekkers als de voorwaarde 'Er is een wekker gezet'.",
+          "it": "Le sveglie che suonano quel giorno, in ordine di orario. Conta le stesse sveglie della condizione «Una sveglia è impostata».",
+          "es": "Las alarmas que suenan ese día, la más temprana primero. Cuenta las mismas alarmas que la condición «Hay alarma programada».",
+          "sv": "Alarmen som ringer den dagen, det tidigaste först. Räknar samma alarm som villkoret ”Ett alarm är ställt”.",
+          "no": "Alarmene som ringer den dagen, den tidligste først. Teller de samme alarmene som betingelsen «En alarm er stilt inn».",
+          "da": "Alarmerne, der ringer den dag, den tidligste først. Tæller de samme alarmer som betingelsen »En alarm er sat«.",
+          "pl": "Alarmy, które dzwonią tego dnia, od najwcześniejszego. Liczy te same alarmy co warunek „Alarm jest ustawiony”.",
+          "ru": "Будильники, которые звонят в этот день, начиная с самого раннего. Учитывает те же будильники, что и условие «Будильник установлен».",
+          "ko": "그날 울리는 알람을 이른 순서대로 가져옵니다. '알람이 설정되어 있으면' 조건과 같은 알람을 셉니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          },
+          {
+            "type": "dropdown",
+            "name": "day",
+            "values": [
+              {
+                "id": "today",
+                "label": {
+                  "en": "today",
+                  "de": "heute",
+                  "fr": "aujourd'hui",
+                  "nl": "vandaag",
+                  "it": "oggi",
+                  "es": "hoy",
+                  "sv": "idag",
+                  "no": "i dag",
+                  "da": "i dag",
+                  "pl": "dzisiaj",
+                  "ru": "сегодня",
+                  "ko": "오늘"
+                }
+              },
+              {
+                "id": "tomorrow",
+                "label": {
+                  "en": "tomorrow",
+                  "de": "morgen",
+                  "fr": "demain",
+                  "nl": "morgen",
+                  "it": "domani",
+                  "es": "mañana",
+                  "sv": "i morgon",
+                  "no": "i morgen",
+                  "da": "i morgen",
+                  "pl": "jutro",
+                  "ru": "завтра",
+                  "ko": "내일"
+                }
+              }
+            ]
+          }
+        ],
+        "tokens": [
+          {
+            "type": "number",
+            "name": "count",
+            "title": {
+              "en": "number of alarms",
+              "de": "Anzahl der Wecker",
+              "fr": "nombre d'alarmes",
+              "nl": "aantal wekkers",
+              "it": "numero di sveglie",
+              "es": "número de alarmas",
+              "sv": "antal alarm",
+              "no": "antall alarmer",
+              "da": "antal alarmer",
+              "pl": "liczba alarmów",
+              "ru": "количество будильников",
+              "ko": "알람 수"
+            },
+            "example": 1
+          },
+          {
+            "type": "string",
+            "name": "time",
+            "title": {
+              "en": "time of the first alarm",
+              "de": "Uhrzeit des ersten Weckers",
+              "fr": "heure de la première alarme",
+              "nl": "tijd van de eerste wekker",
+              "it": "ora della prima sveglia",
+              "es": "hora de la primera alarma",
+              "sv": "tid för det första alarmet",
+              "no": "tidspunkt for den første alarmen",
+              "da": "tidspunkt for den første alarm",
+              "pl": "godzina pierwszego alarmu",
+              "ru": "время первого будильника",
+              "ko": "첫 번째 알람 시간"
+            },
+            "example": {
+              "en": "06:30",
+              "de": "06:30",
+              "fr": "06:30",
+              "nl": "06:30",
+              "it": "06:30",
+              "es": "06:30",
+              "sv": "06:30",
+              "no": "06:30",
+              "da": "06:30",
+              "pl": "06:30",
+              "ru": "06:30",
+              "ko": "06:30"
+            }
+          },
+          {
+            "type": "string",
+            "name": "label",
+            "title": {
+              "en": "label of the first alarm",
+              "de": "Name des ersten Weckers",
+              "fr": "nom de la première alarme",
+              "nl": "naam van de eerste wekker",
+              "it": "nome della prima sveglia",
+              "es": "nombre de la primera alarma",
+              "sv": "namn på det första alarmet",
+              "no": "navn på den første alarmen",
+              "da": "navn på den første alarm",
+              "pl": "nazwa pierwszego alarmu",
+              "ru": "название первого будильника",
+              "ko": "첫 번째 알람 이름"
+            },
+            "example": {
+              "en": "Work",
+              "de": "Arbeit",
+              "fr": "Travail",
+              "nl": "Werk",
+              "it": "Lavoro",
+              "es": "Trabajo",
+              "sv": "Jobb",
+              "no": "Jobb",
+              "da": "Arbejde",
+              "pl": "Praca",
+              "ru": "Работа",
+              "ko": "출근"
+            }
+          },
+          {
+            "type": "string",
+            "name": "times",
+            "title": {
+              "en": "all alarm times",
+              "de": "alle Weckzeiten",
+              "fr": "toutes les heures d'alarme",
+              "nl": "alle wektijden",
+              "it": "tutti gli orari delle sveglie",
+              "es": "todas las horas de alarma",
+              "sv": "alla alarmtider",
+              "no": "alle alarmtider",
+              "da": "alle alarmtider",
+              "pl": "wszystkie godziny alarmów",
+              "ru": "все времена будильников",
+              "ko": "모든 알람 시간"
+            },
+            "example": {
+              "en": "06:30, 08:00",
+              "de": "06:30, 08:00",
+              "fr": "06:30, 08:00",
+              "nl": "06:30, 08:00",
+              "it": "06:30, 08:00",
+              "es": "06:30, 08:00",
+              "sv": "06:30, 08:00",
+              "no": "06:30, 08:00",
+              "da": "06:30, 08:00",
+              "pl": "06:30, 08:00",
+              "ru": "06:30, 08:00",
+              "ko": "06:30, 08:00"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skip-alarms",
+        "title": {
+          "en": "Skip the alarms on a day",
+          "de": "Wecker eines Tages überspringen",
+          "fr": "Ignorer les alarmes d'un jour",
+          "nl": "Wekkers van een dag overslaan",
+          "it": "Salta le sveglie di un giorno",
+          "es": "Omitir las alarmas de un día",
+          "sv": "Hoppa över alarmen en dag",
+          "no": "Hopp over alarmene en dag",
+          "da": "Spring alarmerne over en dag",
+          "pl": "Pomiń alarmy w danym dniu",
+          "ru": "Пропустить будильники в день",
+          "ko": "하루의 알람 건너뛰기"
+        },
+        "titleFormatted": {
+          "en": "Skip the alarms [[day]]",
+          "de": "Überspringe die Wecker [[day]]",
+          "fr": "Ignorer les alarmes [[day]]",
+          "nl": "Sla de wekkers [[day]] over",
+          "it": "Salta le sveglie di [[day]]",
+          "es": "Omitir las alarmas de [[day]]",
+          "sv": "Hoppa över alarmen [[day]]",
+          "no": "Hopp over alarmene [[day]]",
+          "da": "Spring alarmerne over [[day]]",
+          "pl": "Pomiń alarmy [[day]]",
+          "ru": "Пропустить будильники [[day]]",
+          "ko": "[[day]] 알람 건너뛰기"
+        },
+        "hint": {
+          "en": "Repeating alarms skip only that day and stay on. One-time alarms are turned off. Alexa can only skip an alarm's next ring, so this fails for an alarm that rings again later today.",
+          "de": "Wiederkehrende Wecker überspringen nur diesen Tag und bleiben eingeschaltet. Einmalige Wecker werden ausgeschaltet. Alexa kann nur das nächste Klingeln eines Weckers überspringen, deshalb schlägt dies für einen Wecker fehl, der heute noch einmal klingelt.",
+          "fr": "Les alarmes récurrentes ne sautent que ce jour-là et restent activées. Les alarmes uniques sont désactivées. Alexa ne peut ignorer que la prochaine sonnerie d'une alarme : cela échoue donc pour une alarme qui sonne encore plus tard aujourd'hui.",
+          "nl": "Herhalende wekkers slaan alleen die dag over en blijven ingeschakeld. Eenmalige wekkers worden uitgeschakeld. Alexa kan alleen de volgende keer dat een wekker afgaat overslaan, dus dit mislukt voor een wekker die later vandaag nog afgaat.",
+          "it": "Le sveglie ricorrenti saltano solo quel giorno e restano attive. Le sveglie singole vengono disattivate. Alexa può saltare solo il prossimo squillo di una sveglia, quindi non funziona per una sveglia che suona ancora più tardi oggi.",
+          "es": "Las alarmas repetidas solo omiten ese día y siguen activadas. Las alarmas únicas se desactivan. Alexa solo puede omitir el próximo aviso de una alarma, así que falla con una alarma que vuelve a sonar más tarde hoy.",
+          "sv": "Återkommande alarm hoppar bara över den dagen och förblir aktiverade. Engångsalarm inaktiveras. Alexa kan bara hoppa över ett alarms nästa ringning, så det misslyckas för ett alarm som ringer igen senare idag.",
+          "no": "Gjentakende alarmer hopper bare over den dagen og forblir aktivert. Engangsalarmer deaktiveres. Alexa kan bare hoppe over en alarms neste ringing, så dette mislykkes for en alarm som ringer igjen senere i dag.",
+          "da": "Gentagne alarmer springer kun den dag over og forbliver aktiveret. Engangsalarmer deaktiveres. Alexa kan kun springe en alarms næste ringning over, så det mislykkes for en alarm, der ringer igen senere i dag.",
+          "pl": "Alarmy powtarzające się pomijają tylko ten dzień i pozostają włączone. Alarmy jednorazowe zostają wyłączone. Alexa może pominąć tylko najbliższy dzwonek alarmu, więc nie zadziała dla alarmu, który dzwoni jeszcze dziś później.",
+          "ru": "Повторяющиеся будильники пропускают только этот день и остаются включёнными. Одноразовые будильники выключаются. Alexa может пропустить только ближайший звонок будильника, поэтому для будильника, который ещё зазвонит сегодня, это не сработает.",
+          "ko": "반복 알람은 그날만 건너뛰고 켜진 상태로 유지됩니다. 한 번만 울리는 알람은 꺼집니다. Alexa는 알람의 다음 울림만 건너뛸 수 있으므로, 오늘 나중에 다시 울리는 알람에는 실패합니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          },
+          {
+            "type": "dropdown",
+            "name": "day",
+            "values": [
+              {
+                "id": "today",
+                "label": {
+                  "en": "today",
+                  "de": "heute",
+                  "fr": "aujourd'hui",
+                  "nl": "vandaag",
+                  "it": "oggi",
+                  "es": "hoy",
+                  "sv": "idag",
+                  "no": "i dag",
+                  "da": "i dag",
+                  "pl": "dzisiaj",
+                  "ru": "сегодня",
+                  "ko": "오늘"
+                }
+              },
+              {
+                "id": "tomorrow",
+                "label": {
+                  "en": "tomorrow",
+                  "de": "morgen",
+                  "fr": "demain",
+                  "nl": "morgen",
+                  "it": "domani",
+                  "es": "mañana",
+                  "sv": "i morgon",
+                  "no": "i morgen",
+                  "da": "i morgen",
+                  "pl": "jutro",
+                  "ru": "завтра",
+                  "ko": "내일"
+                }
+              }
+            ]
+          }
+        ]
       }
     ],
     "conditions": [
@@ -1743,6 +2154,98 @@
             "type": "device",
             "name": "device",
             "filter": "driver_id=echo"
+          }
+        ]
+      },
+      {
+        "id": "alarm-is-set",
+        "title": {
+          "en": "An alarm is !{{set|not set}}",
+          "de": "Ein Wecker ist !{{gestellt|nicht gestellt}}",
+          "fr": "Une alarme !{{est|n'est pas}} réglée",
+          "nl": "Er is !{{een|geen}} wekker gezet",
+          "it": "Una sveglia !{{è|non è}} impostata",
+          "es": "!{{Hay|No hay}} alarma programada",
+          "sv": "Ett alarm !{{är|är inte}} ställt",
+          "no": "En alarm !{{er|er ikke}} stilt inn",
+          "da": "En alarm !{{er|er ikke}} sat",
+          "pl": "Alarm !{{jest|nie jest}} ustawiony",
+          "ru": "Будильник !{{установлен|не установлен}}",
+          "ko": "알람이 !{{설정되어 있으면|설정되어 있지 않으면}}"
+        },
+        "titleFormatted": {
+          "en": "An alarm is !{{set|not set}} for [[day]]",
+          "de": "Für [[day]] ist !{{ein|kein}} Wecker gestellt",
+          "fr": "Une alarme !{{est|n'est pas}} réglée pour [[day]]",
+          "nl": "Er is !{{een|geen}} wekker gezet voor [[day]]",
+          "it": "Una sveglia !{{è|non è}} impostata per [[day]]",
+          "es": "!{{Hay|No hay}} alarma programada para [[day]]",
+          "sv": "Ett alarm !{{är|är inte}} ställt för [[day]]",
+          "no": "En alarm !{{er|er ikke}} stilt inn for [[day]]",
+          "da": "En alarm !{{er|er ikke}} sat til [[day]]",
+          "pl": "Alarm !{{jest|nie jest}} ustawiony na [[day]]",
+          "ru": "Будильник на [[day]] !{{установлен|не установлен}}",
+          "ko": "[[day]] 알람이 !{{설정되어 있으면|설정되어 있지 않으면}}"
+        },
+        "hint": {
+          "en": "Checks for an alarm that is on and rings that day. Today only counts alarms that haven't rung yet, and a ring skipped with this app doesn't count.",
+          "de": "Prüft, ob ein eingeschalteter Wecker an diesem Tag klingelt. Heute zählen nur Wecker, die noch nicht geklingelt haben, und ein mit dieser App übersprungenes Klingeln zählt nicht.",
+          "fr": "Vérifie si une alarme activée sonne ce jour-là. Aujourd'hui, seules les alarmes qui n'ont pas encore sonné comptent, et une sonnerie ignorée avec cette app ne compte pas.",
+          "nl": "Controleert of een ingeschakelde wekker die dag afgaat. Vandaag tellen alleen wekkers die nog niet zijn afgegaan, en een keer die met deze app is overgeslagen telt niet.",
+          "it": "Verifica se una sveglia attiva suona quel giorno. Oggi contano solo le sveglie che non hanno ancora suonato, e uno squillo saltato con questa app non conta.",
+          "es": "Comprueba si una alarma activada suena ese día. Hoy solo cuentan las alarmas que aún no han sonado, y un aviso omitido con esta app no cuenta.",
+          "sv": "Kontrollerar om ett aktiverat alarm ringer den dagen. Idag räknas bara alarm som inte har ringt än, och en ringning som hoppats över med den här appen räknas inte.",
+          "no": "Sjekker om en aktivert alarm ringer den dagen. I dag teller bare alarmer som ikke har ringt ennå, og en ringing som er hoppet over med denne appen teller ikke.",
+          "da": "Tjekker, om en aktiveret alarm ringer den dag. I dag tæller kun alarmer, der ikke har ringet endnu, og en ringning, der er sprunget over med denne app, tæller ikke.",
+          "pl": "Sprawdza, czy włączony alarm dzwoni tego dnia. Dziś liczą się tylko alarmy, które jeszcze nie dzwoniły, a dzwonek pominięty w tej aplikacji się nie liczy.",
+          "ru": "Проверяет, звонит ли в этот день включённый будильник. Сегодня учитываются только будильники, которые ещё не звонили, а звонок, пропущенный через это приложение, не учитывается.",
+          "ko": "그날 울리는 켜진 알람이 있는지 확인합니다. 오늘은 아직 울리지 않은 알람만 포함되며, 이 앱으로 건너뛴 알람은 포함되지 않습니다."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=echo"
+          },
+          {
+            "type": "dropdown",
+            "name": "day",
+            "values": [
+              {
+                "id": "today",
+                "label": {
+                  "en": "today",
+                  "de": "heute",
+                  "fr": "aujourd'hui",
+                  "nl": "vandaag",
+                  "it": "oggi",
+                  "es": "hoy",
+                  "sv": "idag",
+                  "no": "i dag",
+                  "da": "i dag",
+                  "pl": "dzisiaj",
+                  "ru": "сегодня",
+                  "ko": "오늘"
+                }
+              },
+              {
+                "id": "tomorrow",
+                "label": {
+                  "en": "tomorrow",
+                  "de": "morgen",
+                  "fr": "demain",
+                  "nl": "morgen",
+                  "it": "domani",
+                  "es": "mañana",
+                  "sv": "i morgon",
+                  "no": "i morgen",
+                  "da": "i morgen",
+                  "pl": "jutro",
+                  "ru": "завтра",
+                  "ko": "내일"
+                }
+              }
+            ]
           }
         ]
       }

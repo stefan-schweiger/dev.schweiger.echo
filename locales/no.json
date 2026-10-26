@@ -23,5 +23,9 @@
   },
   "pair": {
     "disconnected": "Ikke koblet til Amazon. Sjekk tilkoblingen i appinnstillingene."
+  },
+  "alarms": {
+    "next": "Neste ringing: __date__",
+    "off": "Av"
   }
 }
