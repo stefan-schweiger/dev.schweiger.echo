@@ -123,6 +123,6 @@
     "en": "New flow cards for alarms: 'Turn an alarm on or off' switches one of your Echo's alarms. For days like public holidays, 'An alarm is set for today/tomorrow', 'Get the alarms for a day' (their times and name as tags) and 'Skip the alarms on a day' work together: a repeating alarm skips only that day and stays on for the days after. Also updates the Amazon library the app talks through: after a dropped connection, Do Not Disturb, music and volume now catch up straight away."
   },
   "2.5.1": {
-    "en": "Fixes signing in for Amazon accounts that don't ask for a 2-step code: the sign-in failed with 'Page Not Found'. Clearer messages when Amazon stops the sign-in with an extra security check, or when your network blocks an Amazon server, and a failed sign-in no longer triggers the 'An error occurred' flow every 5 minutes. Diagnostic logs no longer contain your Amazon sign-in tokens. The network test in app settings now also checks that Amazon's servers can be reached, and adding a device logs why an Echo wasn't offered."
+    "en": "Fixes signing in for Amazon accounts that don't ask for a 2-step code: the sign-in failed with 'Page Not Found'. Clearer messages when Amazon stops the sign-in with an extra security check, or when your network blocks an Amazon server, and a failed sign-in no longer triggers the 'An error occurred' flow every 5 minutes. The network test in app settings now also checks that Amazon's servers can be reached, and adding a device logs why an Echo wasn't offered."
   }
 }
