@@ -6,10 +6,12 @@ Python logger that nothing in the Homey sandbox captures — so they never reach
 user's diagnostic report. This bridges that logger into Homey's app log so the
 detail shows up in a report.
 
-Off by default, and for two reasons: it's verbose, and the library emits a few
-short-lived secrets at DEBUG (the bearer access token inside request headers, the
-CSRF cookie value). We redact those here before anything leaves the app; the
-library already scrubs its structured JSON dumps (see utils.scrub_fields).
+Off by default, and for two reasons: it's verbose, and the library emits
+secrets at DEBUG: short-lived ones (the bearer access token inside request
+headers, the CSRF cookie value) and, during an interactive sign-in, long-lived
+ones (refresh token, device private key, website session cookies). We redact
+those here before anything leaves the app. The library scrubs a few fields of
+its structured JSON dumps (see utils.scrub_fields), but not the long-lived ones.
 
 Pinned to aioamazondevices==17.2.3 — re-check the redaction patterns on library
 bumps against the sensitive DEBUG lines in http_wrapper.session_request / login.
@@ -47,6 +49,29 @@ _REDACTIONS = (
     # neither key and only obfuscates the email. Logged once per install (the
     # id is kept in login_data afterwards), and nothing in it is diagnostic.
     (re.compile(r"(JSON 'users/me' data:).*", re.DOTALL), r"\1 [REDACTED]"),
+    # Long-lived credentials in the sign-in dumps ("JSON 'register' data",
+    # "Register device:", "JSON 'auth_cookies' data", the register and OTP
+    # POST payloads): the refresh token, the device's private key and ADP
+    # token, and full Amazon website session cookies (at-main, session-token,
+    # store_authentication_cookie). The library's scrub list covers none of
+    # them, and support log 727774ab carried all of them — enough to act as
+    # that account until its registration is removed. Matches a key in a
+    # Python dict repr, with the value in either quote style.
+    (
+        re.compile(
+            r"('(?:refresh_token|access_token|source_token|token|device_private_key"
+            r"|adp_token|Value|cookie|otpCode|authorization_code|code_verifier"
+            r"|password)'\s*:\s*)(?:'[^']*'|\"[^\"]*\")"
+        ),
+        r"\1'[REDACTED]'",
+    ),
+    # "Register device: {… 'website_cookies': {'session-id': '…', 'at-main': '…'}}"
+    # — a cookie-name → value map, so no single key to match.
+    (re.compile(r"('website_cookies'\s*:\s*)\{[^{}]*\}"), r"\1{'[REDACTED]'}"),
+    # "Login response url:…openid.oa2.authorization_code=…" and "Login
+    # extracted authcode: …". Single use and spent within a second, but free.
+    (re.compile(r"(openid\.oa2\.authorization_code=)[^&\s]+"), r"\1[REDACTED]"),
+    (re.compile(r"(Login extracted authcode:\s*)\S+"), r"\1[REDACTED]"),
 )
 
 

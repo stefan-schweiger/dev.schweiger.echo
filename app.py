@@ -10,7 +10,7 @@ from homey import app
 from .lib import dnsprobe
 from .lib.alexa import AlexaService, login_error_message
 from .lib.constants import AMAZON_SITES
-from .lib.connection import categorize_error, explained, unresolved_host
+from .lib.connection import categorize_error, explained, unreachable_host, unresolved_host
 from .lib.diagnostics import DiagnosticLogging
 
 SYNC_INTERVAL_MS = 5 * 60 * 1000
@@ -104,6 +104,7 @@ class App(app.App):
         # page polls /status to reflect progress and the final result.
         self.alexa.state = "connecting"
         self.alexa.last_error = None
+        self.alexa.last_error_code = None
         self._login_task = asyncio.create_task(self._do_login(email, password, otp))
         return {"started": True}
 
@@ -119,6 +120,7 @@ class App(app.App):
             await self.alexa.start_interactive(email, password, otp)
         except Exception as e:  # noqa: BLE001
             self.error(f"Login failed: {login_error_message(e)}")
+            self._maybe_probe_dns(e)
             return
         await self._refresh_screen_state()
         self.log("Login successful — connected")
@@ -137,6 +139,7 @@ class App(app.App):
             "connected": self.alexa.state == "connected",
             "state": self.alexa.state,
             "error": self.alexa.last_error,
+            "errorCode": self.alexa.last_error_code,
             "debugLogging": self._diagnostics.enabled,
             "site": self.homey.settings.get("amazon_site") or "",
             "sites": list(AMAZON_SITES),
@@ -403,7 +406,8 @@ class App(app.App):
         return f"alexa.{site or 'amazon.com'}"
 
     def _maybe_probe_dns(self, e: Exception) -> None:
-        """Fire the DNS diagnostic in the background after a resolution failure.
+        """Fire the network diagnostic in the background after a request died in
+        DNS or had its connection refused (lib/connection.py).
 
         Opt-in and throttled. It exists because every DNS test in the support
         thread so far either ran on a different machine or took a different path
@@ -414,7 +418,8 @@ class App(app.App):
         learned is persisted so a run where DoH is blocked still has real names
         to walk.
         """
-        host = unresolved_host(e)
+        unreachable = unreachable_host(e)
+        host = unresolved_host(e) or (unreachable[0] if unreachable else None)
         if host is None or not self.homey.settings.get("debug_logging"):
             return
         if time.monotonic() - self._last_dns_probe_ts < DNS_PROBE_INTERVAL_S:

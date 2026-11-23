@@ -17,6 +17,7 @@
     "debugLogging": "Aktivér diagnostisk logning",
     "debugLoggingHint": "Slå kun dette til ved fejlfinding. Det registrerer detaljerede tekniske logfiler (uden følsomme data), så de vises i en diagnoserapport. Gengiv problemet, mens det er slået til, send en diagnoserapport, og slå det derefter fra igen.",
     "errorOtpPage": "Amazon viste ikke trinnet til indtastning af godkendelseskoden. Det skyldes som regel en forkert e-mail eller adgangskode, eller at to-trins-bekræftelse ikke er sat op med en godkendelses-app (SMS- eller e-mailkoder virker ikke) — nogle gange er det blot et midlertidigt sikkerhedstjek. Tjek din Amazon-e-mail og adgangskode, sørg for, at en godkendelses-app er aktiveret under Amazon → Login og sikkerhed → To-trins-bekræftelse, og prøv derefter igen med en ny kode.",
+    "errorCaptcha": "Amazon stoppede login med et ekstra sikkerhedstjek (en captcha eller en side, hvor du skal bekræfte din identitet), som denne app ikke kan vise. Log ind én gang på amazon.com i en browser på samme netværk, og gennemfør det tjek, Amazon beder om. Prøv derefter igen senere med en ny godkendelseskode.",
     "networkTest": "Kør netværkstest",
     "networkTestHint": "Kontrollerer, hvordan denne Homey slår Amazons adresser op, og skriver resultatet i app-loggen. Kør den, mens problemet opstår, og send derefter en diagnoserapport.",
     "networkTestStarted": "Netværkstest startet. Vent et par sekunder, og send derefter en diagnoserapport."

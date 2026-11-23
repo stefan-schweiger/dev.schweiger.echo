@@ -1,5 +1,7 @@
 """Connection state + error categorization over aioamazondevices exceptions."""
 
+import errno
+import re
 import socket
 from enum import Enum
 from typing import Optional
@@ -77,6 +79,76 @@ def unresolved_host_message(e: BaseException) -> Optional[str]:
     )
 
 
+# connect() failures that mean something on the way refused this address, as
+# opposed to a slow or flaky network. The app forces IPv4 (Homey has no IPv6
+# route), so ENETUNREACH here is about an IPv4 address and not that.
+_REFUSED_CONNECT = {
+    errno.ENETUNREACH: "network unreachable",
+    errno.EHOSTUNREACH: "no route to host",
+    errno.ECONNREFUSED: "connection refused",
+}
+
+# "Connect call failed ('18.244.135.178', 443)" — asyncio puts the address in
+# the message and nowhere else.
+_CONNECT_ADDRESS = re.compile(r"\('([0-9a-fA-F.:]+)',\s*\d+")
+
+
+def unreachable_host(
+    e: BaseException,
+) -> Optional[tuple[Optional[str], Optional[str], str]]:
+    """(host, address, reason) when a connect() was refused, else None.
+
+    Host and address are None when the chain doesn't carry them.
+
+    Same chain walk as unresolved_host: aiohttp raises
+    `ClientConnectorError(connection_key, os_error)`, which carries the host,
+    and the OSError beneath it carries the errno and the address.
+    """
+    host: Optional[str] = None
+    current: Optional[BaseException] = e
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        host = host or getattr(current, "host", None)
+        for candidate in (current, getattr(current, "os_error", None)):
+            if isinstance(candidate, OSError) and candidate.errno in _REFUSED_CONNECT:
+                match = _CONNECT_ADDRESS.search(str(candidate))
+                return (
+                    host,
+                    match.group(1) if match else None,
+                    _REFUSED_CONNECT[candidate.errno],
+                )
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def unreachable_host_message(e: BaseException) -> Optional[str]:
+    """Plain-language reason when a connection to a resolved address was refused.
+
+    Support log 727774ab: sign-in completed, then every request to
+    alexa.amazon.co.uk died within ~20 ms with `OSError(101, "Connect call
+    failed ('18.244.135.178', 443)")` while www.amazon.com and api.amazon.com
+    connected from the same Homey. The user saw only `CannotConnect: Connection
+    error during GET`, which reads like the app or Amazon is broken.
+    """
+    found = unreachable_host(e)
+    if found is None:
+        return None
+    host, address, reason = found
+    host = host or "Amazon"
+    where = f"{host} ({address})" if address else host
+    return (
+        f"Cannot connect to {where}: {reason}. Its address was found, so something "
+        "between this Homey and Amazon — a router or firewall rule, or a VPN — is "
+        "blocking it."
+    )
+
+
+def network_failure_message(e: BaseException) -> Optional[str]:
+    """The DNS or blocked-address explanation, whichever applies, else None."""
+    return unresolved_host_message(e) or unreachable_host_message(e)
+
+
 def explained(handler):
     """Wrap a Flow card run listener so a DNS failure says so on the card.
 
@@ -95,7 +167,7 @@ def explained(handler):
         try:
             return await handler(args, **kwargs)
         except Exception as e:
-            explanation = unresolved_host_message(e)
+            explanation = network_failure_message(e)
             if explanation is None:
                 raise
             raise RuntimeError(explanation) from e
@@ -116,13 +188,13 @@ def categorize_error(e: Exception) -> dict:
             "message": "Authentication expired — please re-authenticate in app settings",
         }
     if isinstance(e, CannotConnect):
-        unresolved = unresolved_host_message(e)
-        if unresolved:
+        explanation = network_failure_message(e)
+        if explanation:
             return {
                 "category": "network",
                 "should_retry": True,
                 "needs_reauth": False,
-                "message": unresolved,
+                "message": explanation,
             }
         return {
             "category": "network",
@@ -150,5 +222,7 @@ def categorize_error(e: Exception) -> dict:
         "category": "unknown",
         "should_retry": False,
         "needs_reauth": False,
-        "message": str(e) or "Unknown error",
+        # Several library exceptions carry no message (WrongMethod, for one);
+        # their type is still more use in a report than "Unknown error".
+        "message": str(e) or type(e).__name__,
     }

@@ -42,8 +42,10 @@ from aioamazondevices.const.http import (
     REQUEST_AGENT,
     URI_BEHAVIORS_AUTOMATIONS,
     URI_DEVICES,
+    URI_NEXUS_GRAPHQL,
     URI_NOTIFICATIONS,
 )
+from aioamazondevices.const.devices import DEVICE_TYPES_TO_IGNORE
 from aioamazondevices.const.schedules import (
     COUNTRY_GROUPS,
     NOTIFICATION_ALARM,
@@ -63,7 +65,7 @@ from aioamazondevices.structures import (
     AmazonSequenceType,
 )
 
-from .connection import MISSING_COUNTRY_MESSAGE, unresolved_host_message
+from .connection import MISSING_COUNTRY_MESSAGE, network_failure_message
 from .constants import DEVICES, SPEAK_VOICES, VOICES
 
 VOLUME_DIVISOR = 100
@@ -151,6 +153,28 @@ ROUTINES_PROBE_INTERVAL_S = 5 * 60
 # error text) and must not be retried.
 OTP_PAGE_MISSING = "expected OTP code entry"
 
+# Amazon's Customer Verification Flow: the captcha (`cvf-aamation-challenge-
+# form`), "Verify your identity" and push/SMS approval pages all live under this
+# path. The library can't get past any of them, so a sign-in that ends here
+# needs the user to clear it in a browser — a different message from "we never
+# saw the 2-step page" (see login_error_code).
+VERIFICATION_PAGE_PATH = "/ap/cvf/"
+
+# Where Amazon's OAuth flow lands once it has signed the user in. The query
+# carries the authorization code; the page itself is a 404 titled "Page Not
+# Found" (checked against www.amazon.com, 2026-11-22).
+AUTH_CODE_PARAM = "openid.oa2.authorization_code"
+
+
+class _SignedInWithoutOtp(Exception):
+    """Amazon finished the sign-in at the password step (see _watch_sign_in)."""
+
+    def __init__(self, code: str, code_verifier: bytes) -> None:
+        super().__init__("Amazon signed in without asking for a 2-step code")
+        self.code = code
+        self.code_verifier = code_verifier
+
+
 # Amazon hands out the account id in two forms and they are NOT interchangeable:
 #   - "amzn1.account.AGP2HK…"  obfuscated id, returned by /auth/register
 #   - "A146V8AS9QOCRT"         directed id, carried by the device list as
@@ -231,7 +255,22 @@ def login_error_message(e: BaseException) -> str:
         )
     if isinstance(e, MissingCountryError):
         return MISSING_COUNTRY_MESSAGE
-    return unresolved_host_message(e) or f"{type(e).__name__}: {e}"
+    return network_failure_message(e) or f"{type(e).__name__}: {e}"
+
+
+def login_error_code(e: BaseException, page: Optional[str]) -> Optional[str]:
+    """A stable code the settings page turns into a translated explanation.
+
+    `page` is the path of the last sign-in page Amazon showed (_watch_sign_in).
+    "captcha": Amazon stopped at one of its verification pages, which the app
+    cannot show. "otp_page": some other page where the 2-step form should have
+    been. The raw message stays in the app log either way.
+    """
+    if isinstance(e, CannotAuthenticate) and OTP_PAGE_MISSING in str(e):
+        if page and VERIFICATION_PAGE_PATH in page:
+            return "captcha"
+        return "otp_page"
+    return None
 
 
 def _voice_ssml(message: str, voice_id: str, mode: str) -> str:
@@ -241,6 +280,15 @@ def _voice_ssml(message: str, voice_id: str, mode: str) -> str:
     if mode == "whisper":
         content = f'<amazon:effect name="whispered">{content}</amazon:effect>'
     return f'<speak><voice name="{voice}"><lang xml:lang="{lang}">{content}</lang></voice></speak>'
+
+
+def _graphql_text(attribute: Any) -> Optional[str]:
+    """`{"value": {"text": "…"}}` -> "…", the shape of GraphQL endpoint attributes."""
+    if not isinstance(attribute, dict):
+        return None
+    value = attribute.get("value")
+    text = value.get("text") if isinstance(value, dict) else None
+    return text if isinstance(text, str) else None
 
 
 def _alarm_on(alarm: dict) -> bool:
@@ -430,6 +478,14 @@ class AlexaService:
         self._recover_tasks: set[asyncio.Task] = set()
         self.state = "disconnected"
         self.last_error: Optional[str] = None
+        # See login_error_code; read by the settings page via /status.
+        self.last_error_code: Optional[str] = None
+        # Path of the last page Amazon showed during an interactive sign-in.
+        self._sign_in_page: Optional[str] = None
+        # Both of Amazon's device lists as last seen, reduced to what pairing
+        # needs to explain itself (see _log_pairing_choices).
+        self._raw_v2_devices: dict[str, dict] = {}
+        self._raw_endpoints: dict[str, dict] = {}
 
         # callbacks wired by app.py
         self.on_state_change: Optional[Callable[[str, Optional[str]], Awaitable[None]]] = None
@@ -522,7 +578,9 @@ class AlexaService:
                 self._log(f"login: complete in {time.monotonic() - t0:.1f}s")
                 return login_data
             except Exception as e:
-                await self._set_state("error", login_error_message(e))
+                await self._set_state(
+                    "error", login_error_message(e), login_error_code(e, self._sign_in_page)
+                )
                 raise
 
     async def _interactive_login_attempt(self, email: str, password: str, otp: str) -> dict:
@@ -532,6 +590,7 @@ class AlexaService:
             await self._teardown()
         self._build(email, password, None)
         login = self._api.login
+        self._watch_sign_in(login)
         if not self.pinned_site:
             return await login.login_mode_interactive(otp)
 
@@ -555,6 +614,65 @@ class AlexaService:
             return await login.login_mode_interactive(otp)
         finally:
             login._domain_refresh_auth_cookies = original
+
+    def _watch_sign_in(self, login) -> None:
+        """Log each page Amazon answers the password with, and accept a sign-in
+        that finished without the 2-step page.
+
+        The library posts email and password (`_oauth_login`), then insists on
+        Amazon's `auth-mfa-otpcode` form. Amazon doesn't always show one: on an
+        account it doesn't ask a 2-step code of, the password POST redirects
+        straight to /ap/maplanding with the authorization code in the URL. That
+        page is a 404 titled "Page Not Found", so the library raised
+        `Unexpected login page 'Page Not Found', expected OTP code entry` and
+        threw away a sign-in that had worked (support logs 727f779c, 72990d38;
+        both failed the same way on our retry). Here the code is taken from the
+        URL and handed to the library's next step as its own OTP path would.
+        Still unhandled upstream in 18.0.0.
+
+        The page line goes to the app log unconditionally (the path and title
+        only, never the query, which carries the code) so a report says which
+        page stopped a sign-in without diagnostic logging: a verification page
+        under /ap/cvf/ (captcha, "Verify your identity") reads differently from
+        a 2-step form the library didn't recognise.
+
+        Pinned to aioamazondevices==17.2.3 (`_oauth_login`,
+        `_login_mode_interactive_oauth` and the dict it returns) — re-check on
+        library bumps.
+        """
+        self._sign_in_page = None
+        oauth_login = login._oauth_login
+        interactive_oauth = login._login_mode_interactive_oauth
+
+        async def watched_oauth_login(code_verifier, registration_language="en-US"):
+            url, soup = await oauth_login(code_verifier, registration_language)
+            self._sign_in_page = url.path
+            title = soup.title.get_text(strip=True) if soup.title else ""
+            captcha = soup.find("form", id="cvf-aamation-challenge-form") is not None
+            self._log(
+                f"login: Amazon answered with {url.path} '{title}'"
+                + (" — a captcha" if captcha else "")
+            )
+            if code := url.query.get(AUTH_CODE_PARAM):
+                raise _SignedInWithoutOtp(code, code_verifier)
+            return url, soup
+
+        async def accepting_interactive_oauth(otp_code):
+            try:
+                return await interactive_oauth(otp_code)
+            except _SignedInWithoutOtp as done:
+                self._log(
+                    "login: Amazon signed in without asking for a 2-step code — "
+                    "continuing with the authorization code it returned"
+                )
+                return {
+                    "authorization_code": done.code,
+                    "code_verifier": done.code_verifier,
+                    "domain": login._session_state_data.domain,
+                }
+
+        login._oauth_login = watched_oauth_login
+        login._login_mode_interactive_oauth = accepting_interactive_oauth
 
     def _shared_connector(self) -> aiohttp.TCPConnector:
         """One connector for the app's lifetime, so its DNS cache outlives a rebuild.
@@ -837,6 +955,8 @@ class AlexaService:
             self._api = None
             self._devices = {}
             self._device_account_ids = {}
+            self._raw_v2_devices = {}
+            self._raw_endpoints = {}
             self._alexa_api_url = None
             self._media_missing_since = {}
             # Next session gets a fresh baseline instead of inheriting this one's.
@@ -1216,10 +1336,64 @@ class AlexaService:
         if isinstance(raw_data, dict) and url == "login_data" and self.on_login_data is not None:
             await self.on_login_data(raw_data)
             return
-        if isinstance(raw_data, str) and URI_DEVICES in url:
-            self._harvest_device_account_ids(raw_data)
+        if not isinstance(raw_data, str):
+            return
+        if URI_DEVICES in url:
+            try:
+                devices = json.loads(raw_data).get("devices", [])
+            except (json.JSONDecodeError, AttributeError):
+                return
+            devices = [d for d in devices if isinstance(d, dict)]
+            self._harvest_device_account_ids(devices)
+            self._note_v2_devices(devices)
+        elif URI_NEXUS_GRAPHQL in url and "serialNumber" in raw_data:
+            # The device query is the only GraphQL query that asks for serial
+            # numbers; the features and sensor queries share its listEndpoints
+            # shape, so the substring check keeps them from replacing it.
+            self._note_endpoints(raw_data)
 
-    def _harvest_device_account_ids(self, body: str) -> None:
+    def _note_v2_devices(self, devices: list[dict]) -> None:
+        """Remember what devices-v2 said about each device, for pairing's log."""
+        self._raw_v2_devices = {
+            d["serialNumber"]: {
+                "type": d.get("deviceType") or "?",
+                "family": d.get("deviceFamily") or "?",
+                "microphone": "MICROPHONE" in (d.get("capabilities") or []),
+            }
+            for d in devices
+            if d.get("serialNumber")
+        }
+
+    def _note_endpoints(self, body: str) -> None:
+        """Remember which devices Amazon's GraphQL endpoint list carries."""
+        try:
+            data = json.loads(body)
+            if ARRAY_WRAPPER in data:
+                data = data[ARRAY_WRAPPER][0]
+            endpoints = data["data"]["listEndpoints"]["endpoints"]
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+            return
+        noted: dict[str, dict] = {}
+        for endpoint in endpoints if isinstance(endpoints, list) else []:
+            if not isinstance(endpoint, dict):
+                continue
+            serial = _graphql_text(endpoint.get("serialNumber"))
+            if not serial:
+                continue
+            dms = (endpoint.get("legacyIdentifiers") or {}).get("dmsIdentifier") or {}
+            categories = (endpoint.get("displayCategories") or {}).get("all") or []
+            noted[serial] = {
+                "type": _graphql_text(dms.get("deviceType")) or "?",
+                "model": _graphql_text(endpoint.get("model")) or "",
+                "voice": any(
+                    isinstance(c, dict) and c.get("value") == "ALEXA_VOICE_ENABLED"
+                    for c in categories
+                ),
+            }
+        if noted:
+            self._raw_endpoints = noted
+
+    def _harvest_device_account_ids(self, devices: list[dict]) -> None:
         """Keep the `deviceAccountId` aioamazondevices drops from AmazonDevice.
 
         It's the key the per-device settings endpoint is addressed by (screen
@@ -1227,10 +1401,6 @@ class AlexaService:
         response is the only place Amazon hands it out. The library parses the
         same body but doesn't carry the field, so we skim it on the way past.
         """
-        try:
-            devices = json.loads(body).get("devices", [])
-        except (json.JSONDecodeError, AttributeError):
-            return
         found = {
             device["serialNumber"]: device["deviceAccountId"]
             for device in devices
@@ -1327,9 +1497,24 @@ class AlexaService:
         except Exception as e:  # noqa: BLE001
             self._log(f"DND sync failed: {type(e).__name__}: {e}")
 
+    def _has_login_data(self) -> bool:
+        """True once Amazon has registered this session's device.
+
+        A sign-in that fails before registration (captcha, wrong password) keeps
+        `_api`, but with nothing to refresh: every heartbeat then logged "access
+        token refresh failed" and raised the library's message-less WrongMethod
+        from login_mode_stored_data(), which reached users as "[unknown] Unknown
+        error" and fired their error Flow every 5 minutes (logs 727f779c,
+        72990d38, b6778e51). A sign-in that registered and then failed partway
+        does have the data, and the heartbeat still finishes that one.
+        """
+        return self._api is not None and bool(
+            self._api._session_state_data.login_stored_data
+        )
+
     async def sync(self) -> None:
         """Heartbeat: refresh session, sync state, keep push channel alive."""
-        if self._api is None:
+        if not self._has_login_data():
             return
         # Refresh the access token every heartbeat (cheap), but only renew the
         # website cookies a few times a day — renewing clears the cookie jar.
@@ -1337,7 +1522,7 @@ class AlexaService:
             time.monotonic() - self._last_cookie_refresh_ts >= COOKIE_REFRESH_INTERVAL_S
         )
         async with self._connect_lock:
-            if self._api is None:
+            if not self._has_login_data():
                 return
             await self.refresh_session(refresh_cookies=refresh_cookies)
         # A stored login only does useful work here while the account customer
@@ -1448,12 +1633,16 @@ class AlexaService:
         if self.on_reauth is not None:
             await self.on_reauth()
 
-    async def _set_state(self, state: str, reason: Optional[str] = None) -> None:
+    async def _set_state(
+        self, state: str, reason: Optional[str] = None, code: Optional[str] = None
+    ) -> None:
         self.state = state
         if state == "connected":
             self.last_error = None
+            self.last_error_code = None
         elif state == "error" and reason:
             self.last_error = reason
+            self.last_error_code = code
         if self.on_state_change is not None:
             await self.on_state_change(state, reason)
 
@@ -2167,4 +2356,68 @@ class AlexaService:
                     name = str(meta["name"]).replace(" ", "")
                     entry["icon"] = f"icon-{name}-Gen{meta['generation']}.svg"
             out.append(entry)
+        if kind == "echo":
+            self._log_pairing_choices({e["data"]["id"] for e in out})
         return out
+
+    def _log_pairing_choices(self, offered: set[str]) -> None:
+        """Say, per device Amazon knows, whether pairing offers it and if not why.
+
+        A device can go missing at four places before pairing sees it: the
+        library skips a devices-v2 entry without the MICROPHONE capability, an
+        Echo that Amazon's GraphQL list doesn't carry, and one only GraphQL
+        carries; then our filter drops any family outside SINGLE_FAMILIES. The
+        library logs the first three at DEBUG only, so "no Echo found" (log
+        f4469a33, an Echo Show 8 Gen4 that plays music and pushes events fine)
+        came with nothing to go on. Always on: pairing is rare and this is one
+        log entry. No names or serials, only type, model and family.
+
+        Skipped silently: types the library ignores outright (the Alexa apps,
+        our own registrations, headphones), speaker groups, and GraphQL-only
+        endpoints that aren't voice devices (lights, plugs, sensors).
+        """
+        lines: list[str] = []
+        for serial in dict.fromkeys([*self._raw_v2_devices, *self._raw_endpoints]):
+            v2 = self._raw_v2_devices.get(serial)
+            endpoint = self._raw_endpoints.get(serial)
+            device = self._devices.get(serial)
+            if v2 is None and not (endpoint and endpoint["voice"]):
+                continue
+            # Speaker groups have no GraphQL endpoint by design and are the
+            # group driver's business.
+            if v2 is not None and v2["family"] == GROUP_FAMILY:
+                continue
+            device_type = next(
+                (t for t in ((endpoint or {}).get("type"), (v2 or {}).get("type")) if t and t != "?"),
+                "?",
+            )
+            if device_type in DEVICE_TYPES_TO_IGNORE:
+                continue
+            family = device.device_family if device else (v2 or {}).get("family", "?")
+            meta = DEVICES.get(device_type) or {}
+            model = (
+                f"{meta['name']} Gen{meta['generation']}"
+                if meta.get("name") and meta.get("generation")
+                else (endpoint or {}).get("model") or "unknown model"
+            )
+
+            if serial in offered:
+                reason = "offered"
+            elif v2 is None:
+                reason = "skipped by the library: only in GraphQL, no devices-v2 entry"
+            elif not v2["microphone"]:
+                reason = "skipped by the library: devices-v2 lists no MICROPHONE capability"
+            elif endpoint is None:
+                reason = "skipped by the library: not in Amazon's GraphQL device list"
+            elif device is None:
+                reason = "skipped by the library"
+            elif family not in SINGLE_FAMILIES:
+                reason = f"not offered: family {family} is not an Echo family"
+            else:
+                reason = "not offered"
+            lines.append(f"  {model} [{device_type}, family {family}]: {reason}")
+
+        if not lines:
+            self._log("pairing: no device lists seen from Amazon")
+            return
+        self._log(f"pairing: {len(offered)} Echo(s) offered\n" + "\n".join(lines))

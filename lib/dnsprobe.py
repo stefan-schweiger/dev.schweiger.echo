@@ -1,4 +1,5 @@
-"""One-shot DNS diagnostics, run only after a lookup has already failed.
+"""One-shot network diagnostics, run only after a request has already failed
+in DNS or had its connection refused, or from the "Run network test" button.
 
 Two French testers spent weeks on `gaierror(-5, 'No address associated with
 hostname')` for `alexa.amazon.<tld>` while `api.amazon.com` resolved fine in the
@@ -9,8 +10,10 @@ does that, and it is the only thing here that is genuinely new information.
 
 Diagnostics only. Nothing in this module resolves anything the app then connects
 to — the app keeps using the system resolver, on purpose (see AGENTS.md). It runs
-behind the debug-logging setting, only once a request has already failed in DNS,
-and throttled by the caller, so it costs nothing in the normal path.
+behind the debug-logging setting, only once a request has already failed in DNS
+or been refused, and throttled by the caller, so it costs nothing in the normal
+path. The connect check at the end opens and closes plain TCP connections; it
+sends nothing.
 
 Deliberately derives the CNAME chain at runtime rather than hardcoding it. All
 European marketplaces currently share `layla.amazon.com` ->
@@ -61,6 +64,11 @@ def _retail_sibling(host: str) -> Optional[str]:
 HOST_ATTEMPTS = 3
 
 RESOLV_CONF = "/etc/resolv.conf"
+
+# The connect check: a few addresses per name, each given a short deadline.
+# Enough to tell "this one address is refused" from "everything is".
+CONNECT_ADDRESSES = 2
+CONNECT_TIMEOUT_S = 5
 
 _DNS_TYPE_A = 1
 _DNS_TYPE_CNAME = 5
@@ -152,6 +160,54 @@ async def _lookup(name: str, family: int, label: str) -> str:
     return f"{name} {label}: {', '.join(addresses)} in {ms:.0f}ms"
 
 
+async def _connect(name: str) -> list[str]:
+    """TCP-connect to the first few IPv4 addresses of `name` on port 443.
+
+    Finding an address and reaching it are separate questions. Support log
+    727774ab resolved alexa.amazon.co.uk fine and then every connect to that
+    one address failed with errno 101 (network unreachable) within ~20 ms,
+    while www.amazon.com connected from the same Homey: a router or firewall
+    refusing one address, which a DNS-only probe could not show. TCP only, no
+    TLS or HTTP, so it says nothing about certificates or Amazon's answer.
+    """
+    loop = asyncio.get_running_loop()
+
+    def resolve() -> list:
+        return socket.getaddrinfo(name, 443, family=socket.AF_INET, type=socket.SOCK_STREAM)
+
+    try:
+        infos = await loop.run_in_executor(None, resolve)
+    except OSError as e:
+        return [f"{name} connect: not resolved (errno={e.errno})"]
+
+    results = []
+    for address in sorted({info[4][0] for info in infos})[:CONNECT_ADDRESSES]:
+        started = loop.time()
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(address, 443), CONNECT_TIMEOUT_S
+            )
+        except TimeoutError:
+            # Before OSError: TimeoutError is one.
+            results.append(f"{name} connect {address}:443: TIMEOUT after {CONNECT_TIMEOUT_S}s")
+            continue
+        except OSError as e:
+            ms = (loop.time() - started) * 1000
+            results.append(
+                f"{name} connect {address}:443: FAILED errno={e.errno} "
+                f"{e.strerror or e} in {ms:.0f}ms"
+            )
+            continue
+        ms = (loop.time() - started) * 1000
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except OSError:
+            pass
+        results.append(f"{name} connect {address}:443: ok in {ms:.0f}ms")
+    return results
+
+
 async def _aliases(name: str) -> str:
     """The alias chain as the system resolver reports it, when it resolves at all.
 
@@ -239,6 +295,13 @@ async def run(
 
         lines.append("  " + await _lookup(CONTROL_HOST, socket.AF_INET, "A"))
         lines.append("  " + await _aliases(CONTROL_HOST))
+
+        # Then whether those addresses can actually be reached, the failing
+        # name first and the control last.
+        for name in dict.fromkeys(
+            n for n in (host, _retail_sibling(host), SIGNIN_HOST, CONTROL_HOST) if n
+        ):
+            lines += ["  " + line for line in await _connect(name)]
     except Exception as e:  # noqa: BLE001
         lines.append(f"  probe aborted: {type(e).__name__}: {e}")
 

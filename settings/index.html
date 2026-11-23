@@ -117,9 +117,19 @@
 
         // Turn a few known technical errors into a clearer, translated explanation.
         // The raw message is still kept in the app log / diagnostic report.
-        const friendlyError = (error) => {
+        // `code` comes from login_error_code() in lib/alexa.py. The substring checks
+        // are the library's raw "no 2-step page" messages: since aioamazondevices
+        // 16.9.1 "…expected OTP code entry", before that "MFA OTP code not found".
+        const friendlyError = (error, code) => {
           const msg = typeof error === 'string' ? error : (error && error.message) || '';
-          if (msg.indexOf('MFA OTP code not found') !== -1) {
+          if (code === 'captcha') {
+            return Homey.__('settings.errorCaptcha');
+          }
+          if (
+            code === 'otp_page' ||
+            msg.indexOf('expected OTP code entry') !== -1 ||
+            msg.indexOf('MFA OTP code not found') !== -1
+          ) {
             return Homey.__('settings.errorOtpPage');
           }
           return error;
@@ -145,7 +155,7 @@
               showView('form');
               if (attempted && res.error) {
                 attempted = false;
-                Homey.alert(friendlyError(res.error));
+                Homey.alert(friendlyError(res.error, res.errorCode));
               }
             }
           });

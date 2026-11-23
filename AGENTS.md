@@ -45,12 +45,12 @@ homey app dependencies add <pkg> # add a dependency (updates manifest pythonPack
 | `api.py` | Web-API endpoints (`connect`/`status`/`disconnect`/`reset`); names match the manifest `api` map. `homey` is injected at call time — do **not** `from homey import Homey`. |
 | `lib/alexa.py` | `AlexaService` — wraps `AmazonEchoApi`: interactive + stored login, HTTP/2 push subscription, command methods (say/announce/whisper/voice/command/sound/routine/volume/playback/do-not-disturb), the per-device settings endpoint (screen power/brightness), alarms (read, on/off, skip), volume scaling, DND polling, pairing list, sounds/routines/voices lookups. |
 | `lib/connection.py` | `ConnectionState` enum + `categorize_error()` over `aioamazondevices` exceptions. |
-| `lib/diagnostics.py` | Opt-in bridge from the library's Python logger into Homey's app log (redacts bearer/CSRF values). Toggled from app settings; see **Diagnostics & support reports**. |
+| `lib/diagnostics.py` | Opt-in bridge from the library's Python logger into Homey's app log (redacts bearer/CSRF values, and the refresh token, device private key, ADP token and website cookies the sign-in dumps carry — log 727774ab leaked all of them up to 2.5.0). Toggled from app settings; see **Diagnostics & support reports**. |
 | `lib/constants.py` | `DEVICES` (deviceType → icon name/generation) and `VOICES` (Amazon Polly voices for "Say/Announce with Voice") and `SPEAK_VOICES` (the subset Alexa.Speak renders). |
 | `drivers/echo/driver.py` | Pairing (filters `ECHO`/`KNIGHT`/`ROOK`) + flow-action registration (incl. sound/routine/voice autocompletes). |
 | `drivers/echo/device.py` | Capabilities, capability listeners, `apply_volume`/`apply_media`, album art, availability. |
 | `drivers/group/*` | Speaker-group driver/device — same structure; pairing filters the `WHA` family. |
-| `settings/index.html` | Sign-in UI: email/password/OTP form; three views (form / connecting / connected) driven by polling `/status`. Plus two always-visible controls: the **Amazon server** picker (Auto + the marketplaces in `AMAZON_SITES`) and the diagnostic-logging switch. |
+| `settings/index.html` | Sign-in UI: email/password/OTP form; three views (form / connecting / connected) driven by polling `/status`. A failed sign-in's `errorCode` (`captcha` / `otp_page`, from `login_error_code()`) picks a translated explanation (`settings.errorCaptcha` / `settings.errorOtpPage`); anything else is shown raw. Plus two always-visible controls: the **Amazon server** picker (Auto + the marketplaces in `AMAZON_SITES`) and the diagnostic-logging switch. |
 
 ## Architecture patterns
 
@@ -149,7 +149,9 @@ same `on_dnd_event` signal, so both paths converge on `App._on_dnd` → `EchoDev
 (which ignores repeats). The library leaves speaker groups and stereo pairs out of the map.
 
 ### Authentication & connection
-- **Sign-in (interactive):** `AmazonEchoApi(session, email, password)` → `api.login.login_mode_interactive(otp)` runs OAuth+PKCE + `POST /auth/register`, yielding a long-lived `refresh_token` (+ `macDms`, cookies). The whole `login_data` dict is stored in Homey settings under `login_data` (email under `email`). Authenticator-app TOTP is **required** (SMS/email codes don't work).
+- **Sign-in (interactive):** `AmazonEchoApi(session, email, password)` → `api.login.login_mode_interactive(otp)` runs OAuth+PKCE + `POST /auth/register`, yielding a long-lived `refresh_token` (+ `macDms`, cookies). The whole `login_data` dict is stored in Homey settings under `login_data` (email under `email`). Authenticator-app TOTP is **required** (SMS/email codes don't work) whenever Amazon asks for a 2-step code at all.
+- **Sign-in without a 2-step page:** on some accounts (no 2-step verification) Amazon answers the password POST by redirecting straight to `/ap/maplanding?…openid.oa2.authorization_code=…`. That page is a 404 titled **"Page Not Found"**, and the library, which only takes the code after an `auth-mfa-otpcode` page, raised `Unexpected login page 'Page Not Found', expected OTP code entry` for a sign-in that had worked (logs 727f779c, 72990d38). `AlexaService._watch_sign_in()` wraps the login's `_oauth_login` / `_login_mode_interactive_oauth` per attempt: when the URL after the password already carries the code, it hands that to registration as the OTP path would. The same wrapper logs every page Amazon answered the password with (see Diagnostics).
+- **A failed sign-in keeps `_api` but has nothing to refresh.** `sync()` returns unless `_has_login_data()`; before that the heartbeat raised the library's message-less `WrongMethod` every 5 minutes, which reached users as "[unknown] Unknown error" and fired their `error` Flow. A sign-in that registered and then failed partway does have the data, and the heartbeat still finishes it.
 - **Reconnect (stored):** `api.login.login_mode_stored_data()` — no credentials needed; access tokens/cookies are re-minted from the refresh token. Since 16.4.0 it also re-registers the device capabilities (an extra token refresh plus a `PUT`) on every call. So connect and session recovery call it. The 5-minute heartbeat only calls it while the account customer id is still missing (a stored login that failed partway), because that lookup is all it ever did there.
 - **Auto-connect is deferred** off `on_init` via `set_timeout(..., 2000)` so drivers initialize first (otherwise `on_state_change` hits "Driver Not Initialized").
 - **Login runs in the background** (`asyncio.create_task`): `connect()` returns immediately because Homey's settings web-api call times out at **10 s** while login takes **~15 s**. The settings page polls `/status` (`disconnected`/`connecting`/`connected`/`error`, plus `error` message) to drive the UI.
@@ -247,11 +249,27 @@ What a user's diagnostic report tells you, and why these lines exist:
   library's raw `CannotAuthenticate: Unable to extract authorization code from url: …` (a bare
   `KeyError: 'openid.oa2.authorization_code'` up to 16.3.0), i.e. Amazon returned no
   authorization code: wrong/expired 2-step code, a captcha, or an extra verification step.
+  `Cannot connect to <host> (<address>): network unreachable …` (`unreachable_host_message()`)
+  means the name resolved and the TCP connect was refused (`ENETUNREACH` / `EHOSTUNREACH` /
+  `ECONNREFUSED`): a router or firewall rule or a VPN blocking that address, not DNS. Log
+  727774ab: `alexa.amazon.co.uk` failed in ~20 ms while `www.amazon.com` connected. Every EU
+  host CNAMEs to `layla.amazon.com`, so pinning another EU server doesn't route around it.
   `Your Amazon account has no country/region set …` is the library's `MissingCountryError`
   (16.8.1), raised by the `users/me` lookup when `countryOfResidence` is empty. Without a country
   everything falls back to amazon.com, and in home-assistant/core#186163 every device showed
   offline. Only the account owner can fix it, in Amazon's Country/Region settings. It is
   deliberately not `needs_reauth`, which would delete the stored login.
+- **Always on, sign-in and pairing:**
+  - `login: Amazon answered with <path> '<title>'` (plus ` — a captcha`) after the password
+    step of each attempt; the query is never logged. `/ap/cvf/…` is Amazon's verification
+    flow (captcha, "verify your identity", push approval), which the library can't pass; the
+    Japanese title some reports show comes from the library's `language=ja_JP` captcha retry,
+    meant for Japanese accounts. `/ap/maplanding 'Page Not Found'` followed by `login: Amazon
+    signed in without asking for a 2-step code` is the sign-in `_watch_sign_in()` accepts.
+  - `pairing: N Echo(s) offered` with one line per device Amazon knows (type, model, family,
+    and why it was or wasn't offered: no `MICROPHONE` in devices-v2, missing from GraphQL,
+    only in GraphQL, or a non-Echo family). Built from `_note_v2_devices` / `_note_endpoints`,
+    which skim both device lists in `_save_to_file`. No names or serials.
 - **Opt-in** (settings → debug logging): the library's own DEBUG stream, incl. the full
   automations payload. Verbose — a routine-heavy account dumps every routine's sequence JSON.
 - **Temporary** — `AlexaService._probe_routines()` fires only when the routine list comes back
@@ -296,7 +314,7 @@ Both writes are versioned — Amazon's optimistic concurrency, per item, rejecte
 ### DNS probe (diagnostics only)
 Background and the full investigation record live in [`docs/dns-investigation.md`](docs/dns-investigation.md) — read that before re-opening this, it lists what has already been ruled out and why the app does not resolve names itself.
 
-`lib/dnsprobe.py` runs once a request has already failed in DNS, fired from `App._maybe_probe_dns()` in the error path. Gated on the `debug_logging` setting and throttled by `DNS_PROBE_INTERVAL_S` (10 min) because the probe is itself a burst of lookups, which is what appears to provoke the failure it investigates. It logs `/etc/resolv.conf`, then asks `https://1.1.1.1/dns-query` (bare IP, so no name resolution and no port 53; verified to validate against certifi) for the target's CNAME chain, then walks every hop of that chain plus `api.amazon.com` as a control through `getaddrinfo`, timed and reporting the EAI code. Point of the design: no test in the support thread ever compared two resolution paths on the same machine at the same moment. The chain is derived at runtime and the last good one persisted in the `dns_chain` setting as a fallback — never hardcoded, because the `tp.<id>-frontier` name is an Amazon internal identifier and a stale hardcoded name would return NXDOMAIN and look exactly like the failure being diagnosed. It resolves nothing the app then connects to; see "Known limitations" for why the app does not do its own resolution. Also triggerable on demand via `POST /dns-probe` (`App.probe_dns()`), wired to the "Run network test" button in app settings — that path ignores both the debug-logging gate and the throttle since it was asked for explicitly, defaults to `AlexaService.alexa_host` for the name to probe, and returns as soon as the probe starts because a Homey web-api call times out at 10 s.
+`lib/dnsprobe.py` runs once a request has already failed in DNS, fired from `App._maybe_probe_dns()` in the error path. Gated on the `debug_logging` setting and throttled by `DNS_PROBE_INTERVAL_S` (10 min) because the probe is itself a burst of lookups, which is what appears to provoke the failure it investigates. It logs `/etc/resolv.conf`, then asks `https://1.1.1.1/dns-query` (bare IP, so no name resolution and no port 53; verified to validate against certifi) for the target's CNAME chain, then walks every hop of that chain plus `api.amazon.com` as a control through `getaddrinfo`, timed and reporting the EAI code, and finally TCP-connects to the first two IPv4 addresses of the target, its retail host, `www.amazon.com` and `api.amazon.com` on 443 (`_connect`, no TLS, nothing sent), because resolving an address and reaching it are separate failures (log 727774ab). It also fires after a sign-in or heartbeat whose connect was refused, not only after a DNS failure. Point of the design: no test in the support thread ever compared two resolution paths on the same machine at the same moment. The chain is derived at runtime and the last good one persisted in the `dns_chain` setting as a fallback — never hardcoded, because the `tp.<id>-frontier` name is an Amazon internal identifier and a stale hardcoded name would return NXDOMAIN and look exactly like the failure being diagnosed. It resolves nothing the app then connects to; see "Known limitations" for why the app does not do its own resolution. Also triggerable on demand via `POST /dns-probe` (`App.probe_dns()`), wired to the "Run network test" button in app settings — that path ignores both the debug-logging gate and the throttle since it was asked for explicitly, defaults to `AlexaService.alexa_host` for the name to probe, and returns as soon as the probe starts because a Homey web-api call times out at 10 s.
 
 ### SSML
 `call_alexa_speak(device, text)` renders SSML if `text` is SSML markup (verified on-device). Used for **whisper** (`<amazon:effect name="whispered">`) and **Say with Voice** (`<voice name="…"><lang xml:lang="…">`). Escape message content with `xml.sax.saxutils.escape`.
@@ -445,7 +463,10 @@ Local workarounds that exist only because `aioamazondevices` hasn't shipped the 
 released; leaving them in is not harmful (each degrades to a no-op) but they're dead weight
 and they monkey-patch private internals.
 
-Nothing is pending right now.
+- **Sign-in that finishes at the password step** (`AlexaService._watch_sign_in`): accept the
+  authorization code already in the `/ap/maplanding` URL instead of insisting on the 2-step
+  page. Still missing in 18.0.0 (`login.py` unchanged). Not filed upstream yet. Keep the
+  page logging even once this lands.
 
 **What changed under us in 16.9.2 → 17.2.3** (fifteen releases in four days; no workaround was
 dropped). The library's login, sequence, to-do, DND and history code, `capabilities.py` and the
